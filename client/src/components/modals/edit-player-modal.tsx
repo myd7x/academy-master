@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 import { format } from "date-fns";
 import {
@@ -78,6 +78,12 @@ export default function EditPlayerModal({ open, onOpenChange, player, defaultTab
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState(defaultTab);
+
+  // Fetch full player data (including documents)
+  const { data: fullPlayerData, isLoading: isLoadingPlayer } = useQuery({
+    queryKey: ['/api/players', player?.id],
+    enabled: !!player?.id && open,
+  });
 
   // Reset active tab whenever the modal opens or the defaultTab changes
   useEffect(() => {
@@ -588,7 +594,7 @@ export default function EditPlayerModal({ open, onOpenChange, player, defaultTab
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <DocumentManager
               playerId={player.id}
-              documents={player.documents || []}
+              documents={fullPlayerData?.documents || []}
               documentType="id"
               documentLabel="ID Document"
               accept=".png,.jpg,.jpeg,.pdf"
@@ -597,7 +603,7 @@ export default function EditPlayerModal({ open, onOpenChange, player, defaultTab
 
             <DocumentManager
               playerId={player.id}
-              documents={player.documents || []}
+              documents={fullPlayerData?.documents || []}
               documentType="medical_form"
               documentLabel="Medical Form"
               accept=".png,.jpg,.jpeg,.pdf"

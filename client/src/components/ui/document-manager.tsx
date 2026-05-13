@@ -75,6 +75,7 @@ export default function DocumentManager({
     onSuccess: () => {
       toast({ title: "Document uploaded successfully" });
       queryClient.invalidateQueries({ queryKey: ['/api/players', playerId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/players'] });
     },
     onError: (error: any) => {
       toast({ 
@@ -100,6 +101,7 @@ export default function DocumentManager({
     onSuccess: () => {
       toast({ title: "Document deleted successfully" });
       queryClient.invalidateQueries({ queryKey: ['/api/players', playerId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/players'] });
       setDeleteDocumentId(null);
     },
     onError: (error: any) => {
@@ -226,9 +228,10 @@ export default function DocumentManager({
                     variant="ghost"
                     size="sm"
                     onClick={() => setDeleteDocumentId(document.id)}
-                    className="h-8 w-8 p-0 hover:bg-red-100"
+                    className="h-8 px-2 text-red-500 hover:bg-red-50 hover:text-red-700"
                   >
-                    <Trash2 className="h-4 w-4 text-red-500" />
+                    <Trash2 className="h-4 w-4 mr-1" />
+                    Delete
                   </Button>
                 )}
               </div>
