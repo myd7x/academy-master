@@ -27,11 +27,16 @@ export function AuthPage() {
 
   return (
     <div className="min-h-screen grid grid-cols-1 md:grid-cols-2 bg-background">
-      <div className="flex items-center justify-center p-8">
-        <Card className="w-full max-w-md">
-          <CardHeader className="space-y-1 text-center">
+      <div className="flex items-center justify-center p-4 sm:p-8 min-h-screen md:min-h-0">
+        <Card className="w-full max-w-md shadow-lg">
+          <CardHeader className="space-y-1 text-center pb-4">
             <div className="flex justify-center mb-4">
-              <ShieldCheck className="h-12 w-12 text-primary" />
+              <img 
+                src="/e1-sport-logo.jpg" 
+                alt="E1 Sport Academy"
+                className="w-16 h-16 rounded-full object-cover shadow-md"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+              />
             </div>
             <CardTitle className="text-2xl font-bold tracking-tight">Admin Portal</CardTitle>
             <CardDescription>

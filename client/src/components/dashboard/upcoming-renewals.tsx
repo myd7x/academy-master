@@ -28,29 +28,50 @@ export default function UpcomingRenewals() {
       <CardHeader>
         <CardTitle>Upcoming Renewals</CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="overflow-x-auto">
+      <CardContent className="p-0 sm:p-6">
+        {/* Mobile card list */}
+        <div className="sm:hidden divide-y divide-gray-100">
+          {(renewals as any)?.length === 0 && (
+            <p className="text-center text-gray-400 py-8 text-sm">No upcoming renewals.</p>
+          )}
+          {(renewals as any)?.map((player: any) => {
+            const activity = ACTIVITIES[player.activity as keyof typeof ACTIVITIES];
+            return (
+              <div key={player.id} className="p-4 space-y-2">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 bg-gray-300 rounded-full flex items-center justify-center shrink-0">
+                    <User className="h-4 w-4 text-gray-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-900 truncate">{player.fullName}</p>
+                    <p className="text-xs text-gray-500">{activity.emoji} {activity.label}</p>
+                  </div>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 shrink-0">
+                    Due
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 text-xs text-gray-600 pl-12">
+                  <span>{format(new Date(player.renewalDate), 'MMM dd, yyyy')}</span>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 font-medium">
+                    {player.sessionsLeft} sessions left
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Desktop table */}
+        <div className="hidden sm:block overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Player
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Activity
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Renewal Date
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Sessions Left
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Player</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Activity</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Renewal Date</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sessions Left</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -105,3 +126,4 @@ export default function UpcomingRenewals() {
     </Card>
   );
 }
+

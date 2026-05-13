@@ -38,49 +38,49 @@ export default function Players() {
   return (
     <>
       {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200 px-8 py-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-gray-900">Players</h2>
-          <div className="flex items-center space-x-3">
+      <header className="bg-white shadow-sm border-b border-gray-200 px-4 sm:px-8 py-4">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900 truncate">Players</h2>
+          <div className="flex items-center gap-2 shrink-0">
             <Button
               variant="outline"
               onClick={handlePrintAll}
               disabled={isPrinting || !allPlayers || (allPlayers as any[]).length === 0}
-              className="border-gray-300 text-gray-700 hover:bg-gray-50"
+              className="border-gray-300 text-gray-700 hover:bg-gray-50 hidden sm:flex"
             >
               <Printer className="mr-2 h-4 w-4" />
-              {isPrinting ? "Generating..." : "Print All Players"}
+              {isPrinting ? "Generating..." : "Print All"}
             </Button>
             <Button 
               onClick={() => setShowAddPlayer(true)}
               className="bg-academy-blue hover:bg-academy-blue-light text-white"
             >
-              <Plus className="mr-2 h-4 w-4" />
-              Add Player
+              <Plus className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Add Player</span>
             </Button>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-8">
+      <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-4 sm:p-8">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200">
           {/* Filters */}
-          <div className="px-6 py-4 border-b border-gray-200">
-            <div className="flex items-center justify-between">
+          <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <h3 className="text-lg font-semibold text-gray-900">Player Management</h3>
-              <div className="flex items-center space-x-4">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                   <Input
                     placeholder="Search players..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 w-64"
+                    className="pl-10 w-full sm:w-64"
                   />
                 </div>
                 <Select value={selectedActivity} onValueChange={setSelectedActivity}>
-                  <SelectTrigger className="w-48">
+                  <SelectTrigger className="w-full sm:w-48">
                     <SelectValue placeholder="All Activities" />
                   </SelectTrigger>
                   <SelectContent>
@@ -107,4 +107,3 @@ export default function Players() {
     </>
   );
 }
-

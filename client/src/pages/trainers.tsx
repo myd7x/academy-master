@@ -523,37 +523,38 @@ export default function Trainers() {
   return (
     <>
       {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200 px-8 py-4">
-        <div className="flex items-center justify-between">
+      <header className="bg-white shadow-sm border-b border-gray-200 px-4 sm:px-8 py-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="flex items-center gap-3">
-            <GraduationCap className="h-7 w-7 text-blue-600" />
+            <GraduationCap className="h-6 w-6 sm:h-7 sm:w-7 text-blue-600 shrink-0" />
             <div>
-              <h2 className="text-2xl font-bold text-gray-900">Payroll Engine</h2>
-              <p className="text-sm text-gray-500">Trainers Salary & Adjustments</p>
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Payroll Engine</h2>
+              <p className="text-xs sm:text-sm text-gray-500">Trainers Salary & Adjustments</p>
             </div>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-lg border">
-              <Label className="text-sm font-semibold text-gray-700 whitespace-nowrap">Global Period:</Label>
+          <div className="flex items-center gap-2 sm:gap-4">
+            <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-lg border flex-1 sm:flex-none">
+              <Label className="text-xs sm:text-sm font-semibold text-gray-700 whitespace-nowrap">Period:</Label>
               <Input
                 type="month"
                 value={month}
                 onChange={(e) => setMonth(e.target.value)}
-                className="w-40 h-8 text-sm"
+                className="w-full sm:w-40 h-8 text-sm"
               />
             </div>
             <Button
               onClick={() => { setEditingTrainer(null); setShowAddTrainer(true); }}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
+              className="bg-blue-600 hover:bg-blue-700 text-white shrink-0"
             >
-              <Plus className="mr-2 h-4 w-4" /> Add Trainer
+              <Plus className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Add Trainer</span>
             </Button>
           </div>
         </div>
       </header>
 
       {/* Content */}
-      <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-8">
+      <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-4 sm:p-8">
         <Tabs defaultValue="trainers">
           <TabsList className="mb-6">
             <TabsTrigger value="trainers">
@@ -600,9 +601,9 @@ export default function Trainers() {
           {/* ─── Tab 2: Global transactions ─── */}
           <TabsContent value="transactions">
             {/* Filters */}
-            <div className="flex flex-wrap gap-3 mb-6">
+            <div className="flex flex-col sm:flex-row flex-wrap gap-3 mb-6">
               <Select value={filterTrainer} onValueChange={setFilterTrainer}>
-                <SelectTrigger className="w-48 bg-white">
+                <SelectTrigger className="w-full sm:w-48 bg-white">
                   <SelectValue placeholder="Filter by trainer…" />
                 </SelectTrigger>
                 <SelectContent>
@@ -614,7 +615,7 @@ export default function Trainers() {
               </Select>
 
               <Select value={filterType} onValueChange={setFilterType}>
-                <SelectTrigger className="w-44 bg-white">
+                <SelectTrigger className="w-full sm:w-44 bg-white">
                   <SelectValue placeholder="Type…" />
                 </SelectTrigger>
                 <SelectContent>

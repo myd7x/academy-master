@@ -103,18 +103,18 @@ export default function RenewalNotifications() {
                       : 'border-blue-500 bg-blue-50'
                 }`}
               >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-2 mb-2">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2 mb-2">
                       {notification.reason === 'renewal_due' ? (
-                        <Calendar className="h-4 w-4 text-orange-600" />
+                        <Calendar className="h-4 w-4 text-orange-600 shrink-0" />
                       ) : (
-                        <Clock className="h-4 w-4 text-blue-600" />
+                        <Clock className="h-4 w-4 text-blue-600 shrink-0" />
                       )}
-                      <span className="font-medium text-gray-900">
+                      <span className="font-medium text-gray-900 truncate">
                         {notification.playerName}
                       </span>
-                      <Badge variant="outline" className="text-xs">
+                      <Badge variant="outline" className="text-xs shrink-0">
                         {activity ? `${activity.emoji} ${activity.label}` : notification.activity}
                       </Badge>
                     </div>
@@ -144,11 +144,11 @@ export default function RenewalNotifications() {
                     </div>
                   </div>
                   
-                  <div className="flex flex-col space-y-2">
+                  <div className="shrink-0">
                     <Button 
                       size="sm" 
                       variant={isUrgent ? "destructive" : "default"}
-                      className="text-xs"
+                      className="text-xs w-full sm:w-auto"
                       onClick={() => handleRenewPlayer(notification.playerId)}
                     >
                       {notification.reason === 'renewal_due' ? 'Renew Now' : 'Renew Subscription'}

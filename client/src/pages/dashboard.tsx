@@ -23,16 +23,16 @@ export default function Dashboard() {
   return (
     <>
       {/* Header */}
-      <header className="bg-white/80 backdrop-blur-md shadow-sm border-b border-gray-100 px-8 py-5 sticky top-0 z-10 transition-all">
-        <div className="flex items-center justify-between">
-          <h2 className="text-3xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-academy-blue to-purple-600">Dashboard</h2>
-          <div className="flex items-center space-x-4">
+      <header className="bg-white/80 backdrop-blur-md shadow-sm border-b border-gray-100 px-4 sm:px-8 py-4 sm:py-5 sticky top-0 z-10 transition-all">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-xl sm:text-3xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-academy-blue to-purple-600 truncate">Dashboard</h2>
+          <div className="flex items-center gap-2 sm:gap-4 shrink-0">
             <Button 
               onClick={() => setShowAddPlayer(true)}
-              className="bg-gradient-to-r from-academy-blue to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-md hover:shadow-lg transition-all rounded-full px-6"
+              className="bg-gradient-to-r from-academy-blue to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-md hover:shadow-lg transition-all rounded-full px-3 sm:px-6 text-sm"
             >
-              <Plus className="mr-2 h-4 w-4" />
-              Add Player
+              <Plus className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Add Player</span>
             </Button>
             <button 
               onClick={() => {
@@ -58,11 +58,11 @@ export default function Dashboard() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-x-hidden overflow-y-auto gradient-bg p-8">
-        <div className="space-y-8 animate-fade-in max-w-7xl mx-auto">
+      <main className="flex-1 overflow-x-hidden overflow-y-auto gradient-bg p-4 sm:p-8">
+        <div className="space-y-6 sm:space-y-8 animate-fade-in max-w-7xl mx-auto">
           <StatsCards />
           
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
             <ActivityOverview />
             <RecentActivities />
           </div>
@@ -85,3 +85,4 @@ export default function Dashboard() {
     </>
   );
 }
+

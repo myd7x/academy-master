@@ -109,13 +109,13 @@ export default function PaymentRecords() {
       <div className="lg:col-span-2">
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span>Payment Records</span>
-              <div className="flex items-center space-x-4">
-                <div className="flex items-center space-x-2">
-                  <Filter className="h-4 w-4 text-gray-500" />
+            <div className="flex flex-col gap-3">
+              <CardTitle>Payment Records</CardTitle>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                <div className="flex items-center gap-2 flex-1">
+                  <Filter className="h-4 w-4 text-gray-500 shrink-0" />
                   <Select value={selectedPlayer} onValueChange={setSelectedPlayer}>
-                    <SelectTrigger className="w-48">
+                    <SelectTrigger className="flex-1 sm:w-48">
                       <SelectValue placeholder="Filter by player" />
                     </SelectTrigger>
                     <SelectContent>
@@ -128,10 +128,10 @@ export default function PaymentRecords() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <Calendar className="h-4 w-4 text-gray-500" />
+                <div className="flex items-center gap-2 flex-1">
+                  <Calendar className="h-4 w-4 text-gray-500 shrink-0" />
                   <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                    <SelectTrigger className="w-40">
+                    <SelectTrigger className="flex-1 sm:w-40">
                       <SelectValue placeholder="Select month" />
                     </SelectTrigger>
                     <SelectContent>
@@ -144,31 +144,75 @@ export default function PaymentRecords() {
                   </Select>
                 </div>
               </div>
-            </CardTitle>
+            </div>
           </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
+          <CardContent className="p-0 sm:p-6">
+            {/* Mobile card list */}
+            <div className="sm:hidden divide-y divide-gray-100">
+              {(!payments || (payments as any).length === 0) && (
+                <p className="text-center text-gray-400 py-8 text-sm px-4">No payments found.</p>
+              )}
+              {(payments as any)?.slice(0, 20).map((payment: any) => {
+                const method = PAYMENT_METHODS[payment.paymentMethod as keyof typeof PAYMENT_METHODS];
+                const statusColor = PAYMENT_STATUS_COLORS[payment.paymentStatus] ?? "bg-gray-100 text-gray-800";
+                const isRefundable = canRefund(payment);
+                const isRefunded = payment.paymentStatus === 'refunded';
+                return (
+                  <div key={payment.id} className={`p-4 space-y-2 ${isRefunded ? 'opacity-75' : ''}`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <button
+                          className="text-sm font-semibold text-academy-blue hover:underline text-left truncate block max-w-full"
+                          onClick={() => { setSelectedPlayer(payment.playerId); setViewPlayerModalOpen(true); }}
+                        >
+                          {payment.playerName || payment.fullName || 'Unknown'}
+                        </button>
+                        <p className="text-xs text-gray-500 truncate">{payment.description || 'Subscription payment'}</p>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <p className={`text-sm font-bold ${isRefunded ? 'line-through text-gray-400' : 'text-gray-900'}`}>
+                          AED {parseFloat(payment.amountPaid).toFixed(2)}
+                        </p>
+                        <p className="text-xs text-gray-400">{format(new Date(payment.paymentDate), 'MMM dd, yyyy')}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm">{method?.icon}</span>
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${statusColor}`}>
+                          {isRefunded && <span className="mr-1">↩</span>}
+                          {formatStatus(payment.paymentStatus)}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button variant="link" className="text-academy-blue p-0 h-auto text-xs"
+                          onClick={() => handleReceiptClick(payment)}>
+                          <Receipt className="h-3.5 w-3.5 mr-1" />Receipt
+                        </Button>
+                        {isRefundable && (
+                          <Button variant="link" className="text-purple-600 p-0 h-auto text-xs"
+                            onClick={() => handleRefundClick(payment)}>
+                            <RotateCcw className="h-3.5 w-3.5 mr-1" />Refund
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Desktop table */}
+            <div className="hidden sm:block overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Player
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Amount
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Method
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Date
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Player</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Method</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
