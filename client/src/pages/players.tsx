@@ -1,0 +1,110 @@
+import { useState } from "react";
+import { Plus, Search, Printer } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import PlayersTable from "@/components/players/players-table";
+import AddPlayerModal from "@/components/modals/add-player-modal";
+import { ACTIVITIES } from "@/lib/constants";
+import { useQuery } from "@tanstack/react-query";
+import { generateAllPlayersPDF } from "@/lib/pdf-generator";
+
+export default function Players() {
+  const [showAddPlayer, setShowAddPlayer] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedActivity, setSelectedActivity] = useState("");
+  const [isPrinting, setIsPrinting] = useState(false);
+
+  const { data: allPlayers } = useQuery({ queryKey: ["/api/players"] });
+
+  const handlePrintAll = () => {
+    const players = allPlayers as any[];
+    if (!players || players.length === 0) return;
+    setIsPrinting(true);
+    try {
+      const pdf = generateAllPlayersPDF(players);
+      pdf.save(`all-players-${new Date().toISOString().split('T')[0]}.pdf`);
+    } finally {
+      setIsPrinting(false);
+    }
+  };
+
+  return (
+    <>
+      {/* Header */}
+      <header className="bg-white shadow-sm border-b border-gray-200 px-8 py-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold text-gray-900">Players</h2>
+          <div className="flex items-center space-x-3">
+            <Button
+              variant="outline"
+              onClick={handlePrintAll}
+              disabled={isPrinting || !allPlayers || (allPlayers as any[]).length === 0}
+              className="border-gray-300 text-gray-700 hover:bg-gray-50"
+            >
+              <Printer className="mr-2 h-4 w-4" />
+              {isPrinting ? "Generating..." : "Print All Players"}
+            </Button>
+            <Button 
+              onClick={() => setShowAddPlayer(true)}
+              className="bg-academy-blue hover:bg-academy-blue-light text-white"
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Add Player
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-8">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+          {/* Filters */}
+          <div className="px-6 py-4 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900">Player Management</h3>
+              <div className="flex items-center space-x-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Input
+                    placeholder="Search players..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10 w-64"
+                  />
+                </div>
+                <Select value={selectedActivity} onValueChange={setSelectedActivity}>
+                  <SelectTrigger className="w-48">
+                    <SelectValue placeholder="All Activities" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Activities</SelectItem>
+                    {Object.entries(ACTIVITIES).map(([key, activity]) => (
+                      <SelectItem key={key} value={key}>
+                        {activity.emoji} {activity.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+
+          <PlayersTable searchTerm={searchTerm} activityFilter={selectedActivity} />
+        </div>
+      </main>
+
+      <AddPlayerModal 
+        open={showAddPlayer}
+        onOpenChange={setShowAddPlayer}
+      />
+    </>
+  );
+}
+

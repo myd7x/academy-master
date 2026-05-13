@@ -1,0 +1,1043 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Academy CRM System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+    tailwind.config = {
+        theme: {
+            extend: {
+                fontFamily: {
+                    'inter': ['Inter', 'sans-serif'],
+                },
+                colors: {
+                    primary: '#1976D2',
+                    secondary: '#424242',
+                    success: '#4CAF50',
+                    warning: '#FF9800',
+                    error: '#F44336',
+                    surface: '#FFFFFF',
+                }
+            }
+        }
+    };
+    </script>
+    <style>
+        @media print {
+            body * { visibility: hidden; }
+            .print-area, .print-area * { visibility: visible; }
+            .print-area { position: absolute; left: 0; top: 0; width: 100%; }
+            .no-print { display: none !important; }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 font-inter">
+    
+    <!-- @COMPONENT: Sidebar Navigation -->
+    <div class="flex h-screen">
+        <aside class="w-64 bg-white shadow-lg fixed left-0 top-0 h-full z-10">
+            <div class="p-6 border-b border-gray-200">
+                <h1 class="text-xl font-bold text-gray-800">Academy CRM</h1>
+                <p class="text-sm text-gray-600">Management System</p>
+            </div>
+            
+            <nav class="mt-6">
+                <ul class="space-y-2 px-4">
+                    <li>
+                        <a href="#dashboard" class="flex items-center px-4 py-3 text-primary bg-blue-50 rounded-lg font-medium" data-nav="dashboard">
+                            <i class="fas fa-tachometer-alt mr-3"></i>
+                            Dashboard
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#players" class="flex items-center px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg" data-nav="players">
+                            <i class="fas fa-users mr-3"></i>
+                            Players
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#payments" class="flex items-center px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg" data-nav="payments">
+                            <i class="fas fa-credit-card mr-3"></i>
+                            Payments
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#sessions" class="flex items-center px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg" data-nav="sessions">
+                            <i class="fas fa-calendar-check mr-3"></i>
+                            Sessions
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#activities" class="flex items-center px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg" data-nav="activities">
+                            <i class="fas fa-dumbbell mr-3"></i>
+                            Activities
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#reports" class="flex items-center px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg" data-nav="reports">
+                            <i class="fas fa-chart-bar mr-3"></i>
+                            Reports
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+        </aside>
+        <!-- @END_COMPONENT: Sidebar Navigation -->
+
+        <!-- @COMPONENT: Main Content Area -->
+        <main class="flex-1 ml-64 overflow-y-auto">
+            
+            <!-- @COMPONENT: Dashboard Section -->
+            <section id="dashboard-section" class="p-8">
+                <div class="mb-8">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-2">Dashboard Overview</h2>
+                    <p class="text-gray-600">Welcome to your academy management system</p>
+                </div>
+
+                <!-- Dashboard Stats Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-gray-600">Total Players</p>
+                                <p class="text-2xl font-bold text-gray-900" data-bind="stats.totalPlayers">1,247</p>
+                            </div>
+                            <div class="bg-blue-100 p-3 rounded-full">
+                                <i class="fas fa-users text-primary text-xl"></i>
+                            </div>
+                        </div>
+                        <div class="mt-4">
+                            <span class="text-success text-sm font-medium">↗ 12% from last month</span>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-gray-600">Active Subscriptions</p>
+                                <p class="text-2xl font-bold text-gray-900" data-bind="stats.activeSubscriptions">892</p>
+                            </div>
+                            <div class="bg-green-100 p-3 rounded-full">
+                                <i class="fas fa-check-circle text-success text-xl"></i>
+                            </div>
+                        </div>
+                        <div class="mt-4">
+                            <span class="text-success text-sm font-medium">↗ 8% from last month</span>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-gray-600">Pending Payments</p>
+                                <p class="text-2xl font-bold text-gray-900" data-bind="stats.pendingPayments">$12,450</p>
+                            </div>
+                            <div class="bg-orange-100 p-3 rounded-full">
+                                <i class="fas fa-exclamation-triangle text-warning text-xl"></i>
+                            </div>
+                        </div>
+                        <div class="mt-4">
+                            <span class="text-error text-sm font-medium">↑ 23 overdue accounts</span>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-gray-600">Monthly Revenue</p>
+                                <p class="text-2xl font-bold text-gray-900" data-bind="stats.monthlyRevenue">$45,890</p>
+                            </div>
+                            <div class="bg-green-100 p-3 rounded-full">
+                                <i class="fas fa-dollar-sign text-success text-xl"></i>
+                            </div>
+                        </div>
+                        <div class="mt-4">
+                            <span class="text-success text-sm font-medium">↗ 15% from last month</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Activity Overview -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-4">Activity Distribution</h3>
+                        <div class="space-y-4">
+                            <!-- @MAP: activities.map(activity => ( -->
+                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                <div class="flex items-center">
+                                    <span class="text-2xl mr-3">🥋</span>
+                                    <span class="font-medium text-gray-800" data-bind="activity.name">Karate</span>
+                                </div>
+                                <div class="flex items-center space-x-3">
+                                    <span class="text-sm text-gray-600" data-bind="activity.count">156 players</span>
+                                    <div class="w-20 bg-gray-200 rounded-full h-2">
+                                        <div class="bg-primary h-2 rounded-full" style="width: 45%"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                <div class="flex items-center">
+                                    <span class="text-2xl mr-3">⚽</span>
+                                    <span class="font-medium text-gray-800" data-bind="activity.name">Football</span>
+                                </div>
+                                <div class="flex items-center space-x-3">
+                                    <span class="text-sm text-gray-600" data-bind="activity.count">134 players</span>
+                                    <div class="w-20 bg-gray-200 rounded-full h-2">
+                                        <div class="bg-success h-2 rounded-full" style="width: 38%"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                <div class="flex items-center">
+                                    <span class="text-2xl mr-3">🏊</span>
+                                    <span class="font-medium text-gray-800" data-bind="activity.name">Swimming</span>
+                                </div>
+                                <div class="flex items-center space-x-3">
+                                    <span class="text-sm text-gray-600" data-bind="activity.count">98 players</span>
+                                    <div class="w-20 bg-gray-200 rounded-full h-2">
+                                        <div class="bg-blue-400 h-2 rounded-full" style="width: 28%"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                <div class="flex items-center">
+                                    <span class="text-2xl mr-3">🥊</span>
+                                    <span class="font-medium text-gray-800" data-bind="activity.name">Kickboxing</span>
+                                </div>
+                                <div class="flex items-center space-x-3">
+                                    <span class="text-sm text-gray-600" data-bind="activity.count">87 players</span>
+                                    <div class="w-20 bg-gray-200 rounded-full h-2">
+                                        <div class="bg-red-400 h-2 rounded-full" style="width: 25%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- @END_MAP )) -->
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-4">Upcoming Renewals</h3>
+                        <div class="space-y-4">
+                            <!-- @MAP: upcomingRenewals.map(renewal => ( -->
+                            <div class="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
+                                <div class="flex items-center">
+                                    <!-- Circular avatar placeholder for player photo -->
+                                    <div class="w-10 h-10 bg-gray-300 rounded-full mr-3 flex items-center justify-center">
+                                        <i class="fas fa-user text-gray-600"></i>
+                                    </div>
+                                    <div>
+                                        <p class="font-medium text-gray-800" data-bind="renewal.playerName">Ahmed Hassan</p>
+                                        <p class="text-sm text-gray-600" data-bind="renewal.activity">🥋 Karate</p>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-sm font-medium text-warning" data-bind="renewal.daysLeft">3 days left</p>
+                                    <p class="text-xs text-gray-600" data-bind="renewal.renewalDate">Jan 15, 2024</p>
+                                </div>
+                            </div>
+
+                            <div class="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
+                                <div class="flex items-center">
+                                    <div class="w-10 h-10 bg-gray-300 rounded-full mr-3 flex items-center justify-center">
+                                        <i class="fas fa-user text-gray-600"></i>
+                                    </div>
+                                    <div>
+                                        <p class="font-medium text-gray-800" data-bind="renewal.playerName">Sarah Mohamed</p>
+                                        <p class="text-sm text-gray-600" data-bind="renewal.activity">🏊 Swimming</p>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-sm font-medium text-warning" data-bind="renewal.daysLeft">5 days left</p>
+                                    <p class="text-xs text-gray-600" data-bind="renewal.renewalDate">Jan 17, 2024</p>
+                                </div>
+                            </div>
+
+                            <div class="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
+                                <div class="flex items-center">
+                                    <div class="w-10 h-10 bg-gray-300 rounded-full mr-3 flex items-center justify-center">
+                                        <i class="fas fa-user text-gray-600"></i>
+                                    </div>
+                                    <div>
+                                        <p class="font-medium text-gray-800" data-bind="renewal.playerName">Omar Ali</p>
+                                        <p class="text-sm text-gray-600" data-bind="renewal.activity">⚽ Football</p>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-sm font-medium text-error" data-bind="renewal.daysLeft">1 day left</p>
+                                    <p class="text-xs text-gray-600" data-bind="renewal.renewalDate">Jan 13, 2024</p>
+                                </div>
+                            </div>
+                            <!-- @END_MAP )) -->
+                        </div>
+                        <button class="w-full mt-4 px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-700 transition-colors" data-event="click:viewAllRenewals">
+                            View All Renewals
+                        </button>
+                    </div>
+                </div>
+            </section>
+            <!-- @END_COMPONENT: Dashboard Section -->
+
+            <!-- @COMPONENT: Players Management Section -->
+            <section id="players-section" class="p-8 hidden">
+                <div class="flex justify-between items-center mb-6">
+                    <div>
+                        <h2 class="text-2xl font-bold text-gray-800 mb-2">Player Management</h2>
+                        <p class="text-gray-600">Manage player registrations and details</p>
+                    </div>
+                    <button class="px-6 py-3 bg-primary text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center" data-event="click:openPlayerForm">
+                        <i class="fas fa-plus mr-2"></i>
+                        Add New Player
+                    </button>
+                </div>
+
+                <!-- Filters and Search -->
+                <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Search Players</label>
+                            <input type="text" placeholder="Search by name or ID..." class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" data-bind="searchQuery">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Activity Filter</label>
+                            <select class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" data-bind="activityFilter">
+                                <option value="">All Activities</option>
+                                <option value="karate">🥋 Karate</option>
+                                <option value="football">⚽ Football</option>
+                                <option value="swimming">🏊 Swimming</option>
+                                <option value="kickboxing">🥊 Kickboxing</option>
+                                <option value="zumba">💃 Zumba</option>
+                                <option value="aerobics">🏋️‍♀️ Aerobics</option>
+                                <option value="crossfit">💪 CrossFit</option>
+                                <option value="gymnastics">🤸‍♀️ Gymnastics</option>
+                                <option value="quran">📖 Quran Memorization</option>
+                                <option value="kindergarten">🎓 Kindergarten</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Status Filter</label>
+                            <select class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" data-bind="statusFilter">
+                                <option value="">All Status</option>
+                                <option value="active">Active</option>
+                                <option value="expired">Expired</option>
+                                <option value="pending">Pending Payment</option>
+                            </select>
+                        </div>
+                        <div class="flex items-end">
+                            <button class="w-full px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors" data-event="click:clearFilters">
+                                Clear Filters
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Players Table -->
+                <div class="bg-white rounded-lg shadow-md overflow-hidden">
+                    <div class="px-6 py-4 border-b border-gray-200">
+                        <h3 class="text-lg font-semibold text-gray-800">Registered Players</h3>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Player</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Activity</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subscription</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment Status</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                <!-- @MAP: players.map(player => ( -->
+                                <tr class="hover:bg-gray-50" data-mock="true">
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="flex items-center">
+                                            <div class="w-10 h-10 bg-gray-300 rounded-full mr-4 flex items-center justify-center">
+                                                <i class="fas fa-user text-gray-600"></i>
+                                            </div>
+                                            <div>
+                                                <div class="text-sm font-medium text-gray-900" data-bind="player.name">Ahmed Hassan Mohamed</div>
+                                                <div class="text-sm text-gray-500" data-bind="player.phone">+966 55 123 4567</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" data-bind="player.id">ACR-2024-001</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800" data-bind="player.activity">
+                                            🥋 Karate
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                        <div data-bind="player.subscription">
+                                            <div class="font-medium">Jan 15, 2024</div>
+                                            <div class="text-gray-500">Expires: Feb 15, 2024</div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-success text-white" data-bind="player.paymentStatus">
+                                            Paid
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                                        <button class="text-primary hover:text-blue-700" data-event="click:editPlayer" data-player-id="ACR-2024-001">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="text-success hover:text-green-700" data-event="click:viewPlayer" data-player-id="ACR-2024-001">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        <button class="text-warning hover:text-orange-700" data-event="click:generateReceipt" data-player-id="ACR-2024-001">
+                                            <i class="fas fa-receipt"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+
+                                <tr class="hover:bg-gray-50" data-mock="true">
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="flex items-center">
+                                            <div class="w-10 h-10 bg-gray-300 rounded-full mr-4 flex items-center justify-center">
+                                                <i class="fas fa-user text-gray-600"></i>
+                                            </div>
+                                            <div>
+                                                <div class="text-sm font-medium text-gray-900" data-bind="player.name">Fatima Al-Zahra</div>
+                                                <div class="text-sm text-gray-500" data-bind="player.phone">+966 56 987 6543</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" data-bind="player.id">ACR-2024-002</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-cyan-100 text-cyan-800" data-bind="player.activity">
+                                            🏊 Swimming
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                        <div data-bind="player.subscription">
+                                            <div class="font-medium">Dec 20, 2023</div>
+                                            <div class="text-red-500">Expires: Jan 20, 2024</div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-warning text-white" data-bind="player.paymentStatus">
+                                            Pending
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                                        <button class="text-primary hover:text-blue-700" data-event="click:editPlayer" data-player-id="ACR-2024-002">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="text-success hover:text-green-700" data-event="click:viewPlayer" data-player-id="ACR-2024-002">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        <button class="text-warning hover:text-orange-700" data-event="click:generateReceipt" data-player-id="ACR-2024-002">
+                                            <i class="fas fa-receipt"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                <!-- @END_MAP )) -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+            <!-- @END_COMPONENT: Players Management Section -->
+
+            <!-- @COMPONENT: Player Registration Form Modal -->
+            <div id="player-form-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
+                <div class="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto m-4">
+                    <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                        <h3 class="text-lg font-semibold text-gray-800">Player Registration Form</h3>
+                        <button class="text-gray-400 hover:text-gray-600" data-event="click:closePlayerForm">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
+                    </div>
+                    
+                    <form class="p-6 space-y-6" data-event="submit:savePlayer">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Full Name *</label>
+                                <input type="text" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="Enter full name" data-bind="player.fullName">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Date of Birth *</label>
+                                <input type="date" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" data-bind="player.dateOfBirth">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
+                                <input type="tel" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="+966 XX XXX XXXX" data-bind="player.phone">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Activity *</label>
+                                <select required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" data-bind="player.activity">
+                                    <option value="">Select Activity</option>
+                                    <option value="karate">🥋 Karate</option>
+                                    <option value="kickboxing">🥊 Kickboxing</option>
+                                    <option value="football">⚽ Football</option>
+                                    <option value="swimming">🏊 Swimming</option>
+                                    <option value="zumba">💃 Zumba</option>
+                                    <option value="aerobics">🏋️‍♀️ Aerobics</option>
+                                    <option value="crossfit">💪 CrossFit</option>
+                                    <option value="gymnastics">🤸‍♀️ Gymnastics</option>
+                                    <option value="quran">📖 Quran Memorization</option>
+                                    <option value="kindergarten">🎓 Kindergarten</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Subscription Date *</label>
+                                <input type="date" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" data-bind="player.subscriptionDate">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Renewal Date</label>
+                                <input type="date" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" data-bind="player.renewalDate">
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Documents</label>
+                            <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                                <i class="fas fa-cloud-upload-alt text-4xl text-gray-400 mb-4"></i>
+                                <p class="text-gray-600 mb-2">Drag and drop files here, or click to select</p>
+                                <input type="file" multiple accept=".pdf,.jpg,.jpeg,.png" class="hidden" id="documents-upload" data-implementation="File upload component for ID, medical forms">
+                                <button type="button" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors" onclick="document.getElementById('documents-upload').click()">
+                                    Choose Files
+                                </button>
+                                <p class="text-xs text-gray-500 mt-2">Supported: PDF, JPG, PNG (Max 5MB each)</p>
+                            </div>
+                        </div>
+                        
+                        <div class="border-t border-gray-200 pt-6">
+                            <h4 class="text-lg font-semibold text-gray-800 mb-4">Payment Information</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Subscription Fee ($)</label>
+                                    <input type="number" step="0.01" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="0.00" data-bind="player.subscriptionFee">
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Amount Paid ($)</label>
+                                    <input type="number" step="0.01" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="0.00" data-bind="player.amountPaid">
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Payment Method</label>
+                                    <select class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" data-bind="player.paymentMethod">
+                                        <option value="">Select Method</option>
+                                        <option value="cash">💵 Cash</option>
+                                        <option value="visa">💳 Visa</option>
+                                        <option value="bank_transfer">🏦 Bank Transfer</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex justify-end space-x-4 pt-6 border-t border-gray-200">
+                            <button type="button" class="px-6 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors" data-event="click:closePlayerForm">
+                                Cancel
+                            </button>
+                            <button type="submit" class="px-6 py-2 bg-primary text-white rounded-lg hover:bg-blue-700 transition-colors">
+                                Save Player
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            <!-- @END_COMPONENT: Player Registration Form Modal -->
+
+            <!-- @COMPONENT: Payment Receipt Modal -->
+            <div id="receipt-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
+                <div class="bg-white rounded-lg shadow-xl w-full max-w-md m-4">
+                    <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center no-print">
+                        <h3 class="text-lg font-semibold text-gray-800">Payment Receipt</h3>
+                        <button class="text-gray-400 hover:text-gray-600" data-event="click:closeReceipt">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="print-area p-6">
+                        <div class="text-center mb-6">
+                            <h2 class="text-2xl font-bold text-gray-800">Academy CRM</h2>
+                            <p class="text-gray-600">Payment Receipt</p>
+                            <div class="border-b border-gray-300 mt-4"></div>
+                        </div>
+                        
+                        <div class="space-y-3 mb-6">
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Receipt #:</span>
+                                <span class="font-medium" data-bind="receipt.number">RCP-2024-001</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Date:</span>
+                                <span class="font-medium" data-bind="receipt.date">January 12, 2024</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Player Name:</span>
+                                <span class="font-medium" data-bind="receipt.playerName">Ahmed Hassan Mohamed</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Player ID:</span>
+                                <span class="font-medium" data-bind="receipt.playerId">ACR-2024-001</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Activity:</span>
+                                <span class="font-medium" data-bind="receipt.activity">🥋 Karate</span>
+                            </div>
+                        </div>
+                        
+                        <div class="border-t border-gray-300 pt-4 mb-6">
+                            <div class="flex justify-between mb-2">
+                                <span class="text-gray-600">Subscription Fee:</span>
+                                <span class="font-medium" data-bind="receipt.subscriptionFee">$150.00</span>
+                            </div>
+                            <div class="flex justify-between mb-2">
+                                <span class="text-gray-600">Amount Paid:</span>
+                                <span class="font-medium text-success" data-bind="receipt.amountPaid">$150.00</span>
+                            </div>
+                            <div class="flex justify-between mb-2">
+                                <span class="text-gray-600">Payment Method:</span>
+                                <span class="font-medium" data-bind="receipt.paymentMethod">💳 Visa</span>
+                            </div>
+                            <div class="flex justify-between text-lg font-bold border-t border-gray-300 pt-2">
+                                <span>Balance Remaining:</span>
+                                <span class="text-success" data-bind="receipt.balanceRemaining">$0.00</span>
+                            </div>
+                        </div>
+                        
+                        <div class="text-center text-sm text-gray-500">
+                            <p>Thank you for your payment!</p>
+                            <p>Contact us: +966 11 XXX XXXX</p>
+                        </div>
+                    </div>
+                    
+                    <div class="px-6 py-4 border-t border-gray-200 flex justify-end space-x-4 no-print">
+                        <button class="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors" data-event="click:closeReceipt">
+                            Close
+                        </button>
+                        <button class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-700 transition-colors" onclick="window.print()">
+                            <i class="fas fa-print mr-2"></i>
+                            Print Receipt
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <!-- @END_COMPONENT: Payment Receipt Modal -->
+
+            <!-- @COMPONENT: Session Management Section -->
+            <section id="sessions-section" class="p-8 hidden">
+                <div class="flex justify-between items-center mb-6">
+                    <div>
+                        <h2 class="text-2xl font-bold text-gray-800 mb-2">Session Management</h2>
+                        <p class="text-gray-600">Track attendance and manage session schedules</p>
+                    </div>
+                    <button class="px-6 py-3 bg-primary text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center" data-event="click:markAttendance">
+                        <i class="fas fa-check mr-2"></i>
+                        Mark Attendance
+                    </button>
+                </div>
+
+                <!-- Session Overview Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-gray-600">Today's Sessions</p>
+                                <p class="text-2xl font-bold text-gray-900" data-bind="sessions.today">24</p>
+                            </div>
+                            <div class="bg-blue-100 p-3 rounded-full">
+                                <i class="fas fa-calendar-day text-primary text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-gray-600">Attendance Rate</p>
+                                <p class="text-2xl font-bold text-gray-900" data-bind="sessions.attendanceRate">87%</p>
+                            </div>
+                            <div class="bg-green-100 p-3 rounded-full">
+                                <i class="fas fa-user-check text-success text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-gray-600">Session Alerts</p>
+                                <p class="text-2xl font-bold text-gray-900" data-bind="sessions.alerts">12</p>
+                            </div>
+                            <div class="bg-orange-100 p-3 rounded-full">
+                                <i class="fas fa-exclamation-circle text-warning text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Session Alerts -->
+                <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Session Reminders & Alerts</h3>
+                    <div class="space-y-4">
+                        <!-- @MAP: sessionAlerts.map(alert => ( -->
+                        <div class="flex items-center justify-between p-4 bg-orange-50 border-l-4 border-warning rounded-lg" data-mock="true">
+                            <div class="flex items-center">
+                                <i class="fas fa-exclamation-triangle text-warning mr-4"></i>
+                                <div>
+                                    <p class="font-medium text-gray-800" data-bind="alert.message">Ahmed Hassan has 1 session remaining before renewal</p>
+                                    <p class="text-sm text-gray-600" data-bind="alert.details">🥋 Karate • Expires: Jan 15, 2024</p>
+                                </div>
+                            </div>
+                            <button class="px-4 py-2 bg-warning text-white rounded-lg hover:bg-orange-600 transition-colors text-sm" data-event="click:sendReminder">
+                                Send Reminder
+                            </button>
+                        </div>
+
+                        <div class="flex items-center justify-between p-4 bg-red-50 border-l-4 border-error rounded-lg" data-mock="true">
+                            <div class="flex items-center">
+                                <i class="fas fa-times-circle text-error mr-4"></i>
+                                <div>
+                                    <p class="font-medium text-gray-800" data-bind="alert.message">Fatima Al-Zahra's subscription has expired</p>
+                                    <p class="text-sm text-gray-600" data-bind="alert.details">🏊 Swimming • Expired: Jan 10, 2024</p>
+                                </div>
+                            </div>
+                            <button class="px-4 py-2 bg-error text-white rounded-lg hover:bg-red-600 transition-colors text-sm" data-event="click:contactPlayer">
+                                Contact Player
+                            </button>
+                        </div>
+                        <!-- @END_MAP )) -->
+                    </div>
+                </div>
+
+                <!-- Session Schedule -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-lg font-semibold text-gray-800">Today's Schedule</h3>
+                        <div class="flex space-x-2">
+                            <select class="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm" data-bind="scheduleDate">
+                                <option value="today">Today</option>
+                                <option value="tomorrow">Tomorrow</option>
+                                <option value="week">This Week</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="space-y-4">
+                        <!-- @MAP: todaySchedule.map(session => ( -->
+                        <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50" data-mock="true">
+                            <div class="flex items-center">
+                                <div class="w-16 h-16 bg-blue-100 rounded-lg flex items-center justify-center mr-4">
+                                    <span class="text-2xl" data-bind="session.activityEmoji">🥋</span>
+                                </div>
+                                <div>
+                                    <h4 class="font-medium text-gray-800" data-bind="session.activity">Karate Class</h4>
+                                    <p class="text-sm text-gray-600" data-bind="session.time">10:00 AM - 11:30 AM</p>
+                                    <p class="text-sm text-gray-500" data-bind="session.participants">15 participants</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-3">
+                                <span class="px-3 py-1 bg-success text-white rounded-full text-sm" data-bind="session.status">In Progress</span>
+                                <button class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-700 transition-colors text-sm" data-event="click:viewSessionDetails">
+                                    View Details
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50" data-mock="true">
+                            <div class="flex items-center">
+                                <div class="w-16 h-16 bg-cyan-100 rounded-lg flex items-center justify-center mr-4">
+                                    <span class="text-2xl" data-bind="session.activityEmoji">🏊</span>
+                                </div>
+                                <div>
+                                    <h4 class="font-medium text-gray-800" data-bind="session.activity">Swimming Class</h4>
+                                    <p class="text-sm text-gray-600" data-bind="session.time">2:00 PM - 3:00 PM</p>
+                                    <p class="text-sm text-gray-500" data-bind="session.participants">12 participants</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-3">
+                                <span class="px-3 py-1 bg-gray-500 text-white rounded-full text-sm" data-bind="session.status">Upcoming</span>
+                                <button class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-700 transition-colors text-sm" data-event="click:viewSessionDetails">
+                                    View Details
+                                </button>
+                            </div>
+                        </div>
+                        <!-- @END_MAP )) -->
+                    </div>
+                </div>
+            </section>
+            <!-- @END_COMPONENT: Session Management Section -->
+
+            <!-- @COMPONENT: Reports Section -->
+            <section id="reports-section" class="p-8 hidden">
+                <div class="mb-6">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-2">Reports & Analytics</h2>
+                    <p class="text-gray-600">Generate comprehensive reports and analyze performance metrics</p>
+                </div>
+
+                <!-- Report Filters -->
+                <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Report Type</label>
+                            <select class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" data-bind="reportType">
+                                <option value="revenue">Revenue Report</option>
+                                <option value="attendance">Attendance Report</option>
+                                <option value="player">Player Report</option>
+                                <option value="activity">Activity Report</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Date Range</label>
+                            <select class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" data-bind="dateRange">
+                                <option value="month">This Month</option>
+                                <option value="quarter">This Quarter</option>
+                                <option value="year">This Year</option>
+                                <option value="custom">Custom Range</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Activity Filter</label>
+                            <select class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" data-bind="activityFilter">
+                                <option value="">All Activities</option>
+                                <option value="karate">🥋 Karate</option>
+                                <option value="football">⚽ Football</option>
+                                <option value="swimming">🏊 Swimming</option>
+                                <option value="kickboxing">🥊 Kickboxing</option>
+                            </select>
+                        </div>
+                        <div class="flex items-end">
+                            <button class="w-full px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-700 transition-colors" data-event="click:generateReport">
+                                Generate Report
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Revenue Summary -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-gray-600">Total Revenue</p>
+                                <p class="text-2xl font-bold text-gray-900" data-bind="revenue.total">$45,890</p>
+                            </div>
+                            <div class="bg-green-100 p-3 rounded-full">
+                                <i class="fas fa-dollar-sign text-success text-xl"></i>
+                            </div>
+                        </div>
+                        <div class="mt-4">
+                            <span class="text-success text-sm font-medium">↗ 15% vs last month</span>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-gray-600">Outstanding Balance</p>
+                                <p class="text-2xl font-bold text-gray-900" data-bind="revenue.outstanding">$12,450</p>
+                            </div>
+                            <div class="bg-orange-100 p-3 rounded-full">
+                                <i class="fas fa-exclamation-triangle text-warning text-xl"></i>
+                            </div>
+                        </div>
+                        <div class="mt-4">
+                            <span class="text-error text-sm font-medium">23 overdue accounts</span>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-gray-600">New Registrations</p>
+                                <p class="text-2xl font-bold text-gray-900" data-bind="revenue.newRegistrations">67</p>
+                            </div>
+                            <div class="bg-blue-100 p-3 rounded-full">
+                                <i class="fas fa-user-plus text-primary text-xl"></i>
+                            </div>
+                        </div>
+                        <div class="mt-4">
+                            <span class="text-success text-sm font-medium">↗ 23% vs last month</span>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-gray-600">Renewal Rate</p>
+                                <p class="text-2xl font-bold text-gray-900" data-bind="revenue.renewalRate">84%</p>
+                            </div>
+                            <div class="bg-purple-100 p-3 rounded-full">
+                                <i class="fas fa-sync-alt text-purple-600 text-xl"></i>
+                            </div>
+                        </div>
+                        <div class="mt-4">
+                            <span class="text-success text-sm font-medium">↗ 5% vs last month</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Report Table -->
+                <div class="bg-white rounded-lg shadow-md overflow-hidden">
+                    <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                        <h3 class="text-lg font-semibold text-gray-800">Revenue by Activity</h3>
+                        <button class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm" data-event="click:exportReport">
+                            <i class="fas fa-download mr-2"></i>
+                            Export CSV
+                        </button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Activity</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Players</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Revenue</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Avg. Fee</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Growth</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                <!-- @MAP: revenueData.map(item => ( -->
+                                <tr class="hover:bg-gray-50" data-mock="true">
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="flex items-center">
+                                            <span class="text-2xl mr-3" data-bind="item.emoji">🥋</span>
+                                            <span class="text-sm font-medium text-gray-900" data-bind="item.name">Karate</span>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" data-bind="item.players">156</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium" data-bind="item.revenue">$18,720</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" data-bind="item.avgFee">$120</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800" data-bind="item.growth">
+                                            ↗ 12%
+                                        </span>
+                                    </td>
+                                </tr>
+
+                                <tr class="hover:bg-gray-50" data-mock="true">
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="flex items-center">
+                                            <span class="text-2xl mr-3" data-bind="item.emoji">⚽</span>
+                                            <span class="text-sm font-medium text-gray-900" data-bind="item.name">Football</span>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" data-bind="item.players">134</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium" data-bind="item.revenue">$13,400</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" data-bind="item.avgFee">$100</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800" data-bind="item.growth">
+                                            ↗ 8%
+                                        </span>
+                                    </td>
+                                </tr>
+
+                                <tr class="hover:bg-gray-50" data-mock="true">
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="flex items-center">
+                                            <span class="text-2xl mr-3" data-bind="item.emoji">🏊</span>
+                                            <span class="text-sm font-medium text-gray-900" data-bind="item.name">Swimming</span>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" data-bind="item.players">98</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium" data-bind="item.revenue">$14,700</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" data-bind="item.avgFee">$150</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800" data-bind="item.growth">
+                                            ↓ 3%
+                                        </span>
+                                    </td>
+                                </tr>
+                                <!-- @END_MAP )) -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+            <!-- @END_COMPONENT: Reports Section -->
+
+        </main>
+        <!-- @END_COMPONENT: Main Content Area -->
+    </div>
+
+    <script>
+        // TODO: Implement business logic, API calls, and state management
+        (function() {
+            // Navigation functionality
+            const navLinks = document.querySelectorAll('[data-nav]');
+            const sections = document.querySelectorAll('section[id$="-section"]');
+            
+            navLinks.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    
+                    // Update active nav
+                    navLinks.forEach(nav => nav.classList.remove('text-primary', 'bg-blue-50', 'font-medium'));
+                    navLinks.forEach(nav => nav.classList.add('text-gray-700'));
+                    this.classList.remove('text-gray-700');
+                    this.classList.add('text-primary', 'bg-blue-50', 'font-medium');
+                    
+                    // Show corresponding section
+                    const targetSection = this.getAttribute('data-nav') + '-section';
+                    sections.forEach(section => section.classList.add('hidden'));
+                    document.getElementById(targetSection).classList.remove('hidden');
+                });
+            });
+
+            // Modal functionality
+            const playerFormModal = document.getElementById('player-form-modal');
+            const receiptModal = document.getElementById('receipt-modal');
+            
+            // Player form modal
+            document.addEventListener('click', function(e) {
+                if (e.target.getAttribute('data-event') === 'click:openPlayerForm') {
+                    playerFormModal.classList.remove('hidden');
+                }
+                if (e.target.getAttribute('data-event') === 'click:closePlayerForm') {
+                    playerFormModal.classList.add('hidden');
+                }
+                if (e.target.getAttribute('data-event') === 'click:generateReceipt') {
+                    receiptModal.classList.remove('hidden');
+                }
+                if (e.target.getAttribute('data-event') === 'click:closeReceipt') {
+                    receiptModal.classList.add('hidden');
+                }
+            });
+
+            // Close modals on backdrop click
+            playerFormModal.addEventListener('click', function(e) {
+                if (e.target === this) {
+                    this.classList.add('hidden');
+                }
+            });
+            
+            receiptModal.addEventListener('click', function(e) {
+                if (e.target === this) {
+                    this.classList.add('hidden');
+                }
+            });
+
+            // Form submission handling
+            document.addEventListener('submit', function(e) {
+                if (e.target.getAttribute('data-event') === 'submit:savePlayer') {
+                    e.preventDefault();
+                    // TODO: Implement player save functionality
+                    console.log('Save player form data');
+                    playerFormModal.classList.add('hidden');
+                }
+            });
+
+            // Initialize with dashboard view
+            document.getElementById('dashboard-section').classList.remove('hidden');
+        })();
+    </script>
+</body>
+</html>

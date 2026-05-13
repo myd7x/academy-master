@@ -1,0 +1,107 @@
+CRM System for Academy - Requirements
+
+Objective:
+Build a CRM system for an academy to track players, their activities, payments, and subscription status. The system should also provide session reminders and allow easy printing of receipts.
+
+Player Registration: Player Details:
+Full Name
+
+Activity (e.g., Karate, Kickboxing, Football, Swimming, Zumba, Aerobics, CrossFit, Gymnastics, Quran Memorization, Kindergarten)
+
+Date of Birth
+
+Documents (e.g., scanned copy of ID, medical form)
+
+Subscription Date
+
+Renewal Date
+
+The registration form should allow editing and updating the player details at any time.
+
+Subscription and Payment Tracking: Payment Information:
+Subscription Fee (total amount)
+
+Amount Paid
+
+Remaining Balance
+
+Payment Method:
+
+Cash
+
+Visa
+
+Bank Transfer
+
+The system should automatically track the payment status and notify when a player has an outstanding balance.
+
+Session Reminders: Subscription Alerts:
+Players should be notified before their renewal date, with a reminder in the 7th session for the month.
+
+For example: “Reminder: You have 1 session left before your subscription ends. Please renew your membership to continue.”
+
+Activity Categorization: Players should be categorized based on their selected activities:
+Karate 🥋
+
+Kickboxing 🥊
+
+Football ⚽
+
+Swimming 🏊🏼
+
+Zumba
+
+Aerobics 🏋🏻‍♂
+
+CrossFit
+
+Gymnastics 👯‍♀
+
+Quran Memorization
+
+Kindergarten
+
+Ability to filter and sort players based on activity types for easy management and updates.
+
+ID and Session Management: ID System:
+Every player should be assigned a unique ID for easy tracking.
+
+The ID should be used for all transactions and record keeping.
+
+Session Flexibility:
+
+The ability to mark sessions attended by the player.
+
+Notify and flag players for their remaining or upcoming sessions based on their subscription.
+
+Receipt Generation: The system should allow for the generation of receipts upon payment.
+Include information such as:
+
+Player's Name
+
+Activity
+
+Date of Payment
+
+Amount Paid
+
+Payment Method
+
+Balance Remaining (if applicable)
+
+The receipt should be printable or available in PDF format.
+
+Additional Features: Dashboard View:
+The admin should have a dashboard showing:
+
+Total players
+
+Subscription renewal status
+
+Pending payments
+
+Upcoming sessions
+
+Reports and Analytics:
+
+Ability to generate monthly or yearly reports on income, player attendance, and other metrics and use mysql database
