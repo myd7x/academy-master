@@ -173,7 +173,7 @@ export default function AddAdditionalPaymentModal({
                           <div className="text-gray-500">{p.receiptNumber}</div>
                         </div>
                         <div className="text-right">
-                          <div className="font-bold text-green-600">${p.amountPaid}</div>
+                          <div className="font-bold text-green-600">AED {p.amountPaid}</div>
                           <div className="text-gray-500">{PAYMENT_METHODS[p.paymentMethod as keyof typeof PAYMENT_METHODS]?.label || p.paymentMethod}</div>
                         </div>
                       </div>
@@ -187,7 +187,7 @@ export default function AddAdditionalPaymentModal({
               name="amountPaid"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Amount to Pay ($) *</FormLabel>
+                  <FormLabel>Amount to Pay (AED) *</FormLabel>
                   <FormControl>
                     <Input
                       type="number"

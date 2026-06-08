@@ -19,9 +19,19 @@ export default function PaymentOverview() {
     );
   }
 
-  const totalCollected = parseFloat((stats as any)?.monthlyRevenue || '0');
+  // monthlyIncome = gross player payments + advance repayments - refunds (true net collected)
+  const totalCollected = parseFloat((stats as any)?.monthlyIncome || '0');
   const pendingPayments = parseFloat((stats as any)?.pendingPayments || '0');
-  const overdue = 0; // TODO: Add overdue calculation
+  const overduePayments = parseFloat((stats as any)?.overduePayments || '0');
+
+  const methodBreakdown: Record<string, number> = (stats as any)?.paymentMethodBreakdown || {};
+  const methodTotal: number = (stats as any)?.paymentMethodTotal || 0;
+
+  const getMethodPercent = (key: string): string => {
+    if (methodTotal <= 0) return '0%';
+    const pct = ((methodBreakdown[key] || 0) / methodTotal) * 100;
+    return `${pct.toFixed(1)}%`;
+  };
 
   return (
     <div className="lg:col-span-1 space-y-6">
@@ -34,19 +44,19 @@ export default function PaymentOverview() {
             <div className="flex justify-between items-center">
               <span className="text-sm text-gray-600">Total Collected</span>
               <span className="text-lg font-bold text-green-600">
-                ${totalCollected.toLocaleString()}
+                AED {totalCollected.toLocaleString()}
               </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-gray-600">Pending Payments</span>
               <span className="text-lg font-bold text-academy-red">
-                ${pendingPayments.toLocaleString()}
+                AED {pendingPayments.toLocaleString()}
               </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-gray-600">Overdue</span>
               <span className="text-lg font-bold text-red-600">
-                ${overdue.toLocaleString()}
+                AED {overduePayments.toLocaleString()}
               </span>
             </div>
           </div>
@@ -66,10 +76,13 @@ export default function PaymentOverview() {
                   <span className="text-sm">{method.label}</span>
                 </div>
                 <span className="text-sm font-medium">
-                  {key === 'cash' ? '45%' : key === 'visa' ? '35%' : '20%'}
+                  {getMethodPercent(key)}
                 </span>
               </div>
             ))}
+            {methodTotal === 0 && (
+              <p className="text-xs text-gray-400 text-center pt-1">No payments this month</p>
+            )}
           </div>
         </CardContent>
       </Card>

@@ -334,7 +334,7 @@ export default function AddPlayerModal({ open, onOpenChange }: AddPlayerModalPro
                   name="subscriptionFee"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Total Subscription Fee ($) *</FormLabel>
+                      <FormLabel>Total Subscription Fee (AED) *</FormLabel>
                       <FormControl>
                         <Input 
                           type="number" 

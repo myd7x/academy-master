@@ -80,7 +80,7 @@ export default function EditPlayerModal({ open, onOpenChange, player, defaultTab
   const [activeTab, setActiveTab] = useState(defaultTab);
 
   // Fetch full player data (including documents)
-  const { data: fullPlayerData, isLoading: isLoadingPlayer } = useQuery({
+  const { data: fullPlayerData, isLoading: isLoadingPlayer } = useQuery<any>({
     queryKey: ['/api/players', player?.id],
     enabled: !!player?.id && open,
   });
@@ -501,7 +501,7 @@ export default function EditPlayerModal({ open, onOpenChange, player, defaultTab
                   name="monthlySubscriptionFee"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Monthly Subscription Fee ($) *</FormLabel>
+                      <FormLabel>Monthly Subscription Fee (AED) *</FormLabel>
                       <FormControl>
                         <Input 
                           type="number" 
@@ -633,7 +633,7 @@ export default function EditPlayerModal({ open, onOpenChange, player, defaultTab
                     name="subscriptionFee"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>New Subscription Fee ($) *</FormLabel>
+                        <FormLabel>New Subscription Fee (AED) *</FormLabel>
                         <FormControl>
                           <Input 
                             type="number" 
@@ -710,7 +710,7 @@ export default function EditPlayerModal({ open, onOpenChange, player, defaultTab
                     name="amountPaid"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Amount Paid Today ($)</FormLabel>
+                        <FormLabel>Amount Paid Today (AED)</FormLabel>
                         <FormControl>
                           <Input 
                             type="number" 
@@ -797,7 +797,7 @@ export default function EditPlayerModal({ open, onOpenChange, player, defaultTab
                     </div>
                     <div className="flex justify-between font-medium">
                       <span>New subscription fee:</span>
-                      <span>${renewalForm.watch('subscriptionFee') || player.monthlySubscriptionFee}</span>
+                      <span>AED {renewalForm.watch('subscriptionFee') || player.monthlySubscriptionFee}</span>
                     </div>
                   </div>
                 </div>

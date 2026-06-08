@@ -112,6 +112,7 @@ export default function AddSalaryPaymentModal({ open, onOpenChange, trainer, cur
       queryClient.invalidateQueries({ queryKey: ["/api/trainers", trainer?.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/trainers-all-payments"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
       toast({ title: "Salary payment recorded", description: `AED ${amount} for ${trainer?.name}` });
       onOpenChange(false);
     },

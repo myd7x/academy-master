@@ -12,6 +12,8 @@ import Sessions from "@/pages/sessions";
 import Activities from "@/pages/activities";
 import Reports from "@/pages/reports";
 import Trainers from "@/pages/trainers";
+import Expenses from "@/pages/expenses";
+import Inventory from "@/pages/inventory";
 import { AuthPage, ProtectedRoute } from "@/pages/auth-page";
 import { AuthProvider } from "@/hooks/use-auth";
 
@@ -27,6 +29,8 @@ function Router() {
       <ProtectedRoute path="/activities" component={Activities} />
       <ProtectedRoute path="/reports" component={Reports} />
       <ProtectedRoute path="/trainers" component={Trainers} />
+      <ProtectedRoute path="/expenses" component={Expenses} />
+      <ProtectedRoute path="/inventory" component={Inventory} />
       <Route component={NotFound} />
     </Switch>
   );

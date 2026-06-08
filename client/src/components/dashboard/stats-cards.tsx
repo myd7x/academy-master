@@ -11,6 +11,9 @@ import {
   Clock,
   CalendarDays,
   RotateCcw,
+  Package,
+  PackageMinus,
+  AlertTriangle as AlertTriangleIcon,
 } from "lucide-react";
 
 function fmt(val: string | undefined) {
@@ -130,12 +133,12 @@ export default function StatsCards() {
           <StatCard
             title="Monthly Expenses"
             value={fmt(s?.monthlyExpenses)}
-            sub={`Salaries ${fmt(s?.monthlyTrainerCashPayments)} · Advances ${fmt(s?.monthlyAdvancesCreated)}`}
+            sub={`Salaries/Adv · Academy Exp`}
             icon={TrendingDown}
             iconBg="bg-rose-100"
             iconColor="text-rose-600"
             valueColor="text-rose-700"
-            tooltip={`Trainer cash payments: ${fmt(s?.monthlyTrainerCashPayments)}\nAdvances issued: ${fmt(s?.monthlyAdvancesCreated)}`}
+            tooltip={`Trainer cash payments: ${fmt(s?.monthlyTrainerCashPayments)}\nAdvances issued: ${fmt(s?.monthlyAdvancesCreated)}\nAcademy Expenses: ${fmt(s?.monthlyAcademyExpenses ?? (parseFloat(s?.monthlyExpenses || "0") - parseFloat(s?.monthlyTrainerCashPayments || "0") - parseFloat(s?.monthlyAdvancesCreated || "0")).toFixed(2))}`}
           />
           <StatCard
             title="Monthly Profit"
@@ -176,7 +179,7 @@ export default function StatsCards() {
           <StatCard
             title="Annual Expenses"
             value={fmt(s?.annualExpenses)}
-            sub="Salaries + advances YTD"
+            sub="Salaries + advances + expenses YTD"
             icon={TrendingDown}
             iconBg="bg-rose-100"
             iconColor="text-rose-600"
@@ -190,6 +193,50 @@ export default function StatsCards() {
             iconBg={annualProfit >= 0 ? "bg-teal-100" : "bg-orange-100"}
             iconColor={annualProfit >= 0 ? "text-teal-600" : "text-orange-600"}
             valueColor={annualProfit >= 0 ? "text-teal-700" : "text-orange-700"}
+          />
+        </div>
+      </div>
+
+      {/* ── Row 4: Inventory Summary ────────────────────────────────────── */}
+      <div>
+        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">
+          Inventory Summary
+        </p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <StatCard
+            title="Total Items"
+            value={s?.inventoryTotalItems?.toString() || "0"}
+            sub="Active items in inventory"
+            icon={Package}
+            iconBg="bg-blue-100"
+            iconColor="text-blue-600"
+          />
+          <StatCard
+            title="Out of Stock"
+            value={s?.inventoryOutOfStock?.toString() || "0"}
+            sub="Items with zero quantity"
+            icon={PackageMinus}
+            iconBg="bg-red-100"
+            iconColor="text-red-600"
+            valueColor={s?.inventoryOutOfStock > 0 ? "text-red-600" : "text-gray-900"}
+          />
+          <StatCard
+            title="Low Stock"
+            value={s?.inventoryLowStock?.toString() || "0"}
+            sub="Items at or below min quantity"
+            icon={AlertTriangleIcon}
+            iconBg="bg-amber-100"
+            iconColor="text-amber-600"
+            valueColor={s?.inventoryLowStock > 0 ? "text-amber-600" : "text-gray-900"}
+          />
+          <StatCard
+            title="Inventory Value"
+            value={fmt(s?.inventoryTotalValue)}
+            sub="Estimated current value"
+            icon={Banknote}
+            iconBg="bg-emerald-100"
+            iconColor="text-emerald-600"
+            valueColor="text-emerald-700"
           />
         </div>
       </div>

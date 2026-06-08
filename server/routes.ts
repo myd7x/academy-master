@@ -490,7 +490,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Validate that the new payment doesn't exceed subscription fee
       if (newTotalPaid > subscriptionFee) {
         return res.status(400).json({ 
-          message: `Payment amount exceeds subscription fee. Maximum payment allowed: $${(subscriptionFee - totalPaidSoFar).toFixed(2)}` 
+          message: `Payment amount exceeds subscription fee. Maximum payment allowed: AED ${(subscriptionFee - totalPaidSoFar).toFixed(2)}`
         });
       }
 
@@ -986,6 +986,238 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching trainer ledger:", error);
       res.status(500).json({ message: "Failed to fetch trainer ledger" });
+    }
+  });
+
+  // ─── Expenses Routes ────────────────────────────────────────────────────────
+  app.get("/api/expenses", async (req, res) => {
+    try {
+      const expensesList = await storage.getExpenses(req.query);
+      res.json(expensesList);
+    } catch (error) {
+      console.error("Error fetching expenses:", error);
+      res.status(500).json({ message: "Failed to fetch expenses" });
+    }
+  });
+
+  app.post("/api/expenses", async (req, res) => {
+    try {
+      const expenseData = {
+        ...req.body,
+        date: req.body.date ? new Date(req.body.date) : new Date(),
+        createdBy: ((req.user as any)?.id === 'admin-id') ? null : (req.user as any)?.id
+      };
+      const reqContext = { ipAddress: req.ip, userAgent: req.headers['user-agent'] };
+      const created = await storage.createExpense(expenseData, reqContext);
+      res.status(201).json(created);
+    } catch (error) {
+      console.error("Error creating expense:", error);
+      res.status(400).json({ message: error instanceof Error ? error.message : "Failed to create expense" });
+    }
+  });
+
+  app.put("/api/expenses/:id", async (req, res) => {
+    try {
+      const updateData = {
+        ...req.body,
+        date: req.body.date ? new Date(req.body.date) : undefined,
+        updatedBy: ((req.user as any)?.id === 'admin-id') ? null : (req.user as any)?.id
+      };
+      const reqContext = { ipAddress: req.ip, userAgent: req.headers['user-agent'] };
+      const updated = await storage.updateExpense(req.params.id, updateData, reqContext);
+      if (!updated) {
+        return res.status(404).json({ message: "Expense not found" });
+      }
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating expense:", error);
+      res.status(400).json({ message: error instanceof Error ? error.message : "Failed to update expense" });
+    }
+  });
+
+  app.delete("/api/expenses/:id", async (req, res) => {
+    try {
+      const userId = ((req.user as any)?.id === 'admin-id') ? null : (req.user as any)?.id;
+      const reason = req.body?.reason || undefined;
+      const reqContext = { ipAddress: req.ip, userAgent: req.headers['user-agent'] };
+      const deleted = await storage.deleteExpense(req.params.id, userId, reason, reqContext);
+      if (!deleted) {
+        return res.status(404).json({ message: "Expense not found" });
+      }
+      res.json({ message: "Expense deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting expense:", error);
+      res.status(500).json({ message: "Failed to delete expense" });
+    }
+  });
+
+  // ─── Inventory Routes ───────────────────────────────────────────────────────
+  app.get("/api/inventory", async (req, res) => {
+    try {
+      const items = await storage.getInventoryItems(req.query);
+      res.json(items);
+    } catch (error) {
+      console.error("Error fetching inventory:", error);
+      res.status(500).json({ message: "Failed to fetch inventory" });
+    }
+  });
+
+  app.post("/api/inventory", async (req, res) => {
+    try {
+      const itemData = {
+        ...req.body,
+        sku: req.body.sku?.trim() || null,
+        createdBy: ((req.user as any)?.id === 'admin-id') ? null : (req.user as any)?.id
+      };
+      const reqContext = { ipAddress: req.ip, userAgent: req.headers['user-agent'] };
+      const created = await storage.createInventoryItem(itemData, reqContext);
+      res.status(201).json(created);
+    } catch (error) {
+      console.error("Error creating inventory item:", error);
+      res.status(400).json({ message: error instanceof Error ? error.message : "Failed to create inventory item" });
+    }
+  });
+
+  app.put("/api/inventory/:id", async (req, res) => {
+    try {
+      const updateData = {
+        ...req.body,
+        sku: req.body.sku?.trim() || null,
+        updatedBy: ((req.user as any)?.id === 'admin-id') ? null : (req.user as any)?.id
+      };
+      const reqContext = { ipAddress: req.ip, userAgent: req.headers['user-agent'] };
+      const updated = await storage.updateInventoryItem(req.params.id, updateData, reqContext);
+      if (!updated) {
+        return res.status(404).json({ message: "Inventory item not found" });
+      }
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating inventory item:", error);
+      res.status(400).json({ message: error instanceof Error ? error.message : "Failed to update inventory item" });
+    }
+  });
+
+  app.delete("/api/inventory/:id", async (req, res) => {
+    try {
+      const userId = ((req.user as any)?.id === 'admin-id') ? null : (req.user as any)?.id;
+      const reason = req.body?.reason || undefined;
+      const reqContext = { ipAddress: req.ip, userAgent: req.headers['user-agent'] };
+      const deleted = await storage.deleteInventoryItem(req.params.id, userId, reason, reqContext);
+      if (!deleted) {
+        return res.status(404).json({ message: "Inventory item not found" });
+      }
+      res.json({ message: "Inventory item deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting inventory item:", error);
+      res.status(500).json({ message: "Failed to delete inventory item" });
+    }
+  });
+
+  app.get("/api/inventory/:id/transactions", async (req, res) => {
+    try {
+      const txs = await storage.getInventoryTransactions(req.params.id);
+      res.json(txs);
+    } catch (error) {
+      console.error("Error fetching inventory transactions:", error);
+      res.status(500).json({ message: "Failed to fetch inventory transactions" });
+    }
+  });
+
+  app.post("/api/inventory/transactions", async (req, res) => {
+    try {
+      const { createExpense, expenseCategory, paymentMethod, unitCostAtTransaction, ...restData } = req.body;
+      const txData = {
+        ...restData,
+        // Carry user-provided unit cost so storage can record it on the transaction
+        unitCostAtTransaction: unitCostAtTransaction || null,
+        transactionDate: req.body.transactionDate ? new Date(req.body.transactionDate) : new Date(),
+        createdBy: ((req.user as any)?.id === 'admin-id') ? null : (req.user as any)?.id
+      };
+      
+      const expenseData = createExpense ? {
+        createExpense: true,
+        unitCost: parseFloat(unitCostAtTransaction || "0"),
+        category: expenseCategory || 'equipment',
+        paymentMethod: paymentMethod || 'cash'
+      } : undefined;
+
+      const reqContext = {
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent']
+      };
+
+      const created = await storage.createInventoryTransaction(txData, expenseData, reqContext);
+
+      res.status(201).json(created);
+    } catch (error) {
+      console.error("Error creating inventory transaction:", error);
+      res.status(400).json({ message: error instanceof Error ? error.message : "Failed to process inventory transaction" });
+    }
+  });
+
+  // ─── Receipt Upload for Expenses ─────────────────────────────────────────
+  app.post("/api/expenses/:id/receipt", upload.single('receipt'), async (req, res) => {
+    try {
+      const file = req.file;
+      if (!file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+      const receiptUrl = `/uploads/${file.filename}`;
+      const updated = await storage.updateExpense(req.params.id, { receiptUrl } as any);
+      if (!updated) {
+        return res.status(404).json({ message: "Expense not found" });
+      }
+      res.json({ receiptUrl, message: "Receipt uploaded successfully" });
+    } catch (error) {
+      console.error("Error uploading receipt:", error);
+      res.status(500).json({ message: "Failed to upload receipt" });
+    }
+  });
+
+  // ─── Activity Logs ────────────────────────────────────────────────────────
+  app.get("/api/activity-logs", async (req, res) => {
+    try {
+      const { entityType, limit, offset } = req.query;
+      const result = await storage.getActivityLogs({
+        entityType: entityType as string,
+        limit: limit ? parseInt(limit as string) : 50,
+        offset: offset ? parseInt(offset as string) : 0,
+      });
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching activity logs:", error);
+      res.status(500).json({ message: "Failed to fetch activity logs" });
+    }
+  });
+
+  // ─── Dashboard Chart Data ─────────────────────────────────────────────────
+  app.get("/api/dashboard/expense-trends", async (req, res) => {
+    try {
+      const trends = await storage.getExpenseTrends();
+      res.json(trends);
+    } catch (error) {
+      console.error("Error fetching expense trends:", error);
+      res.status(500).json({ message: "Failed to fetch expense trends" });
+    }
+  });
+
+  app.get("/api/dashboard/expense-categories", async (req, res) => {
+    try {
+      const categories = await storage.getExpenseCategories();
+      res.json(categories);
+    } catch (error) {
+      console.error("Error fetching expense categories:", error);
+      res.status(500).json({ message: "Failed to fetch expense categories" });
+    }
+  });
+
+  app.get("/api/dashboard/inventory-movements", async (req, res) => {
+    try {
+      const movements = await storage.getInventoryMovements();
+      res.json(movements);
+    } catch (error) {
+      console.error("Error fetching inventory movements:", error);
+      res.status(500).json({ message: "Failed to fetch inventory movements" });
     }
   });
 

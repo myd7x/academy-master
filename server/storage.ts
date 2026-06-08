@@ -12,6 +12,10 @@ import {
   trainerAdvances,
   trainerBonuses,
   trainerPayrolls,
+  expenses,
+  inventoryItems,
+  inventoryTransactions,
+  activityLogs,
   type Player, 
   type InsertPlayer,
   type PlayerDocument,
@@ -36,9 +40,17 @@ import {
   type InsertTrainerBonus,
   type TrainerPayroll,
   type InsertTrainerPayroll,
+  type Expense,
+  type InsertExpense,
+  type InventoryItem,
+  type InsertInventoryItem,
+  type InventoryTransaction,
+  type InsertInventoryTransaction,
+  type ActivityLog,
+  type InsertActivityLog,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, asc, sql, and, gte, lte, count, sum } from "drizzle-orm";
+import { eq, desc, asc, sql, and, gte, lte, lt, ne, count, sum, isNull } from "drizzle-orm";
 
 // ─────────────────────────────────────────────────────────────────
 // Allowed refund methods — any other value is rejected at the storage layer
@@ -102,11 +114,12 @@ export interface IStorage {
   getPlayers(): Promise<Player[]>;
   getPlayersByActivity(activity: string): Promise<Player[]>;
   createPlayer(player: InsertPlayer): Promise<Player>;
-  updatePlayer(id: string, player: Partial<InsertPlayer>): Promise<Player | undefined>;
+  updatePlayer(id: string, player: Partial<typeof players.$inferInsert>): Promise<Player | undefined>;
   deletePlayer(id: string): Promise<boolean>;
   
   // Player Documents
   getPlayerDocuments(playerId: string): Promise<PlayerDocument[]>;
+  getPlayerDocument(id: string): Promise<PlayerDocument | null>;
   createPlayerDocument(document: InsertPlayerDocument): Promise<PlayerDocument>;
   deletePlayerDocument(id: string): Promise<boolean>;
   
@@ -158,6 +171,18 @@ export interface IStorage {
     annualExpenses: string;
     annualNetProfit: string;
     annualRefunds: string;
+
+    // Inventory summary
+    inventoryTotalItems: number;
+    inventoryLowStock: number;
+    inventoryOutOfStock: number;
+    inventoryTotalValue: string;
+
+    // Payment method breakdown (monthly)
+    paymentMethodBreakdown: Record<string, number>;
+    paymentMethodTotal: number;
+    overduePayments: string;
+
     // Legacy (keep for backward compat)
     monthlyRevenue: string;
     totalSalaryExpenses: string;
@@ -181,7 +206,7 @@ export interface IStorage {
   // Trainer Advances
   getTrainerAdvances(trainerId?: string, status?: string): Promise<TrainerAdvance[]>;
   createTrainerAdvance(advance: InsertTrainerAdvance): Promise<TrainerAdvance>;
-  repayTrainerAdvance(advanceId: string): Promise<TrainerAdvance | undefined>;
+  repayTrainerAdvance(advanceId: string, repaidNote?: string): Promise<TrainerAdvance | undefined>;
 
   // Trainer Bonuses
   getTrainerBonuses(trainerId?: string, month?: string): Promise<TrainerBonus[]>;
@@ -224,6 +249,36 @@ export interface IStorage {
     subscriptionStatus: string;
     reason: 'sessions_low' | 'renewal_due';
   }>>;
+
+  // ─── Expenses ─────────────────────────────────────────────────────────────
+  getExpenses(filters?: { month?: string, category?: string }): Promise<Expense[]>;
+  getExpense(id: string): Promise<Expense | undefined>;
+  createExpense(expense: InsertExpense, reqContext?: { ipAddress?: string; userAgent?: string }): Promise<Expense>;
+  updateExpense(id: string, expense: Partial<typeof expenses.$inferInsert>, reqContext?: { ipAddress?: string; userAgent?: string }): Promise<Expense | undefined>;
+  deleteExpense(id: string, userId?: string, reason?: string, reqContext?: { ipAddress?: string; userAgent?: string }): Promise<boolean>;
+
+  // ─── Inventory ────────────────────────────────────────────────────────────
+  getInventoryItems(filters?: { category?: string }): Promise<InventoryItem[]>;
+  getInventoryItem(id: string): Promise<InventoryItem | undefined>;
+  createInventoryItem(item: InsertInventoryItem, reqContext?: { ipAddress?: string; userAgent?: string }): Promise<InventoryItem>;
+  updateInventoryItem(id: string, item: Partial<typeof inventoryItems.$inferInsert>, reqContext?: { ipAddress?: string; userAgent?: string }): Promise<InventoryItem | undefined>;
+  deleteInventoryItem(id: string, userId?: string, reason?: string, reqContext?: { ipAddress?: string; userAgent?: string }): Promise<boolean>;
+
+  getInventoryTransactions(itemId?: string): Promise<InventoryTransaction[]>;
+  createInventoryTransaction(
+    transaction: InsertInventoryTransaction,
+    expenseData?: { createExpense: boolean; unitCost: number; category: string; paymentMethod: string },
+    reqContext?: { ipAddress?: string; userAgent?: string }
+  ): Promise<InventoryTransaction>;
+
+  // ─── Activity Logs ────────────────────────────────────────────────────────
+  getActivityLogs(filters?: { entityType?: string; limit?: number; offset?: number }): Promise<{ logs: ActivityLog[]; total: number }>;
+  logActivity(log: InsertActivityLog & { ipAddress?: string; userAgent?: string }): Promise<void>;
+
+  // ─── Dashboard Charts ─────────────────────────────────────────────────────
+  getExpenseTrends(): Promise<Array<{ month: string; total: string }>>;
+  getExpenseCategories(): Promise<Array<{ category: string; total: string }>>;
+  getInventoryMovements(): Promise<Array<{ month: string; stockIn: number; stockOut: number; adjustment: number }>>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -276,7 +331,7 @@ export class DatabaseStorage implements IStorage {
     return player;
   }
 
-  async updatePlayer(id: string, playerUpdate: Partial<InsertPlayer>): Promise<Player | undefined> {
+  async updatePlayer(id: string, playerUpdate: Partial<typeof players.$inferInsert>): Promise<Player | undefined> {
     await db
       .update(players)
       .set({ ...playerUpdate, updatedAt: new Date() })
@@ -345,10 +400,25 @@ export class DatabaseStorage implements IStorage {
   async createPayment(insertPayment: InsertPayment): Promise<Payment> {
     const id = nanoid();
     const receiptNumber = `E1-${new Date().getFullYear()}-${Date.now()}`;
+
+    // Derive paymentStatus from the balance — schema default is 'completed' which is wrong for partial payments
+    const subscriptionFee = parseFloat(String(insertPayment.subscriptionFee || '0'));
+    const amountPaid = parseFloat(String(insertPayment.amountPaid || '0'));
+    const remaining = parseFloat(String((insertPayment as any).remainingBalance || '0'));
+    let derivedStatus: string;
+    if (remaining <= 0) {
+      derivedStatus = 'completed';
+    } else if (amountPaid > 0) {
+      derivedStatus = 'pending'; // partial payment — still owes
+    } else {
+      derivedStatus = 'pending'; // no payment made yet
+    }
+
     await db.insert(payments).values({
       ...insertPayment,
       id,
       receiptNumber,
+      paymentStatus: derivedStatus,
     } as any);
     const [payment] = await db.select().from(payments).where(eq(payments.id, id));
     return payment;
@@ -716,7 +786,7 @@ export class DatabaseStorage implements IStorage {
     const monthlyPlayerRevenueResult = await db
       .select({ total: sql<string>`COALESCE(CAST(SUM(${payments.amountPaid}) AS CHAR), '0')` })
       .from(payments)
-      .where(and(gte(payments.paymentDate, monthStart), lte(payments.paymentDate, monthEnd)));
+      .where(and(gte(payments.paymentDate, monthStart), lt(payments.paymentDate, monthEnd)));
     const monthlyPlayerRevenue = monthlyPlayerRevenueResult[0].total || '0';
 
     // (2) Monthly advance repayments (advances the trainer paid BACK in cash this month)
@@ -727,7 +797,7 @@ export class DatabaseStorage implements IStorage {
       .where(and(
         eq(trainerAdvances.status, 'repaid'),
         gte(trainerAdvances.deductedAt, monthStart),
-        lte(trainerAdvances.deductedAt, monthEnd)
+        lt(trainerAdvances.deductedAt, monthEnd)
       ));
     const monthlyAdvanceRepayments = monthlyAdvanceRepaymentsResult[0].total || '0';
 
@@ -735,7 +805,7 @@ export class DatabaseStorage implements IStorage {
     const monthlyRefundsResult = await db
       .select({ total: sql<string>`COALESCE(CAST(SUM(${paymentRefunds.refundAmount}) AS CHAR), '0')` })
       .from(paymentRefunds)
-      .where(and(gte(paymentRefunds.refundDate, monthStart), lte(paymentRefunds.refundDate, monthEnd)));
+      .where(and(gte(paymentRefunds.refundDate, monthStart), lt(paymentRefunds.refundDate, monthEnd)));
     const monthlyRefunds = monthlyRefundsResult[0].total || '0';
 
     const monthlyIncomeNum =
@@ -763,11 +833,22 @@ export class DatabaseStorage implements IStorage {
       .from(trainerAdvances)
       .where(and(
         gte(trainerAdvances.createdAt, monthStart),
-        lte(trainerAdvances.createdAt, monthEnd)
+        lt(trainerAdvances.createdAt, monthEnd)
       ));
     const monthlyAdvancesCreated = monthlyAdvancesCreatedResult[0].total || '0';
 
-    const monthlyExpensesNum = parseFloat(monthlyTrainerCashPayments) + parseFloat(monthlyAdvancesCreated);
+    // (3) Monthly academy expenses (rent, utilities, etc.) — exclude soft-deleted
+    const monthlyAcademyExpensesResult = await db
+      .select({ total: sql<string>`COALESCE(CAST(SUM(${expenses.amount}) AS CHAR), '0')` })
+      .from(expenses)
+      .where(and(
+        gte(expenses.date, monthStart),
+        lt(expenses.date, monthEnd),
+        isNull(expenses.deletedAt)
+      ));
+    const monthlyAcademyExpenses = monthlyAcademyExpensesResult[0].total || '0';
+
+    const monthlyExpensesNum = parseFloat(monthlyTrainerCashPayments) + parseFloat(monthlyAdvancesCreated) + parseFloat(monthlyAcademyExpenses);
     const monthlyExpenses = monthlyExpensesNum.toFixed(2);
 
     // Monthly Profit
@@ -811,7 +892,16 @@ export class DatabaseStorage implements IStorage {
       .from(trainerAdvances)
       .where(gte(trainerAdvances.createdAt, yearStart));
     const annualAdvancesCreated = parseFloat(annualAdvancesCreatedResult[0].total || '0');
-    const annualExpensesNum = annualTrainerCash + annualAdvancesCreated;
+    const annualAcademyExpensesResult = await db
+      .select({ total: sql<string>`COALESCE(CAST(SUM(${expenses.amount}) AS CHAR), '0')` })
+      .from(expenses)
+      .where(and(
+        gte(expenses.date, yearStart),
+        isNull(expenses.deletedAt)
+      ));
+    const annualAcademyExpenses = parseFloat(annualAcademyExpensesResult[0].total || '0');
+
+    const annualExpensesNum = annualTrainerCash + annualAdvancesCreated + annualAcademyExpenses;
 
     // ── LEDGER STATES (not cash flow) ─────────────────────────────────────────
     // Outstanding (pending) advances — a liability, not an expense
@@ -838,6 +928,65 @@ export class DatabaseStorage implements IStorage {
     }
     const outstandingSalaries = outstandingSalariesNum.toFixed(2);
 
+    // ── PAYMENT METHOD BREAKDOWN (monthly) ───────────────────────────────────
+    const methodBreakdownResult = await db
+      .select({
+        method: payments.paymentMethod,
+        total: sql<string>`COALESCE(CAST(SUM(${payments.amountPaid}) AS CHAR), '0')`,
+      })
+      .from(payments)
+      .where(and(gte(payments.paymentDate, monthStart), lt(payments.paymentDate, monthEnd)))
+      .groupBy(payments.paymentMethod);
+
+    const paymentMethodBreakdown: Record<string, number> = { cash: 0, visa: 0, bank_transfer: 0 };
+    let methodTotal = 0;
+    for (const row of methodBreakdownResult) {
+      const amount = parseFloat(row.total || '0');
+      paymentMethodBreakdown[row.method] = amount;
+      methodTotal += amount;
+    }
+
+    // ── OVERDUE BALANCE ───────────────────────────────────────────────────────
+    // Overdue = player has unpaid balance AND their subscription is expired/cancelled.
+    // We derive this dynamically (paymentStatus='overdue' is never set by any job).
+    const overduePaymentsResult = await db
+      .select({ total: sql<string>`COALESCE(CAST(SUM(${payments.remainingBalance}) AS CHAR), '0')` })
+      .from(payments)
+      .leftJoin(players, eq(payments.playerId, players.id))
+      .where(
+        and(
+          sql`${payments.remainingBalance} > 0`,
+          sql`${players.subscriptionStatus} IN ('expired', 'cancelled')`
+        )
+      );
+    const overduePayments = overduePaymentsResult[0].total || '0';
+
+    // ── INVENTORY STATS ───────────────────────────────────────────────────────
+    // Exclude soft-deleted items; include all non-deleted regardless of status
+    const allInventoryItems = await db.select().from(inventoryItems).where(
+      isNull(inventoryItems.deletedAt)
+    );
+    
+    let inventoryTotalItems = 0;
+    let inventoryLowStock = 0;
+    let inventoryOutOfStock = 0;
+    let inventoryValueNum = 0;
+
+    for (const item of allInventoryItems) {
+      if (item.status === 'discontinued' || item.status === 'inactive') continue;
+      inventoryTotalItems++;
+      if (item.quantity <= 0) {
+        inventoryOutOfStock++;
+      } else if (item.quantity <= item.minQuantity) {
+        inventoryLowStock++;
+      }
+      
+      if (item.unitPrice && item.quantity > 0) {
+        inventoryValueNum += item.quantity * parseFloat(item.unitPrice);
+      }
+    }
+    const inventoryTotalValue = inventoryValueNum.toFixed(2);
+
     return {
       totalPlayers,
       activeSubscriptions,
@@ -860,6 +1009,15 @@ export class DatabaseStorage implements IStorage {
       annualExpenses: annualExpensesNum.toFixed(2),
       annualNetProfit: (annualIncomeNum - annualExpensesNum).toFixed(2),
       annualRefunds: annualRefunds.toFixed(2),
+      // Inventory summary
+      inventoryTotalItems,
+      inventoryLowStock,
+      inventoryOutOfStock,
+      inventoryTotalValue,
+      // Payment method breakdown for current month
+      paymentMethodBreakdown,
+      paymentMethodTotal: methodTotal,
+      overduePayments,
       // Legacy fields — kept for backward compatibility
       monthlyRevenue: monthlyPlayerRevenue,
       totalSalaryExpenses: monthlyTrainerCashPayments,
@@ -907,7 +1065,8 @@ export class DatabaseStorage implements IStorage {
         id: payments.id,
         playerId: payments.playerId,
         amountPaid: payments.amountPaid,
-        createdAt: payments.createdAt
+        createdAt: payments.createdAt,
+        playerName: players.fullName,
       })
       .from(payments)
       .innerJoin(players, eq(payments.playerId, players.id))
@@ -924,10 +1083,10 @@ export class DatabaseStorage implements IStorage {
       })),
       ...recentPayments.map((payment: any) => ({
         type: 'payment',
-        description: `Payment received: $${payment.amountPaid}`,
+        description: `Payment received: AED ${payment.amountPaid}`,
         timestamp: payment.createdAt,
         playerId: payment.playerId,
-        playerName: ''
+        playerName: payment.playerName || ''
       }))
     ];
 
@@ -1373,6 +1532,454 @@ export class DatabaseStorage implements IStorage {
       bonuses: currentBonusesList,
     };
   }
+
+  // ─── Expenses Methods ─────────────────────────────────────────────────────
+  async getExpenses(filters?: { month?: string, category?: string }): Promise<Expense[]> {
+    const showSalary = !filters?.category || filters.category === 'all' || filters.category === 'salary';
+    const showNonSalary = !filters?.category || filters.category === 'all' || filters.category !== 'salary';
+
+    // Query regular expenses (exclude soft-deleted, optionally exclude salary category since those come from payroll)
+    let regularRows: Expense[] = [];
+    if (showNonSalary) {
+      const conditions: any[] = [isNull(expenses.deletedAt), ne(expenses.category, 'salary' as any)];
+      if (filters?.month && filters.month !== 'all') {
+        conditions.push(sql`DATE_FORMAT(${expenses.date}, '%Y-%m') = ${filters.month}`);
+      }
+      regularRows = await db.select().from(expenses).where(and(...conditions)).orderBy(desc(expenses.date)) as any;
+    }
+
+    // Query salary payments from payroll table and map to Expense shape
+    let salaryRows: Expense[] = [];
+    if (showSalary) {
+      const salaryConditions: any[] = [];
+      if (filters?.month && filters.month !== 'all') {
+        // salary payments: filter by payment date (createdAt), not the salary month period
+        salaryConditions.push(sql`DATE_FORMAT(${trainerSalaryPayments.createdAt}, '%Y-%m') = ${filters.month}`);
+      }
+      const rawSalary = await db
+        .select({
+          id: trainerSalaryPayments.id,
+          amount: trainerSalaryPayments.amount,
+          month: trainerSalaryPayments.month,
+          notes: trainerSalaryPayments.notes,
+          createdAt: trainerSalaryPayments.createdAt,
+          trainerName: trainers.name,
+        })
+        .from(trainerSalaryPayments)
+        .innerJoin(trainers, eq(trainerSalaryPayments.trainerId, trainers.id))
+        .where(salaryConditions.length ? and(...salaryConditions) : undefined as any)
+        .orderBy(desc(trainerSalaryPayments.createdAt));
+
+      salaryRows = rawSalary.map(r => ({
+        id: r.id,
+        category: 'salary' as any,
+        amount: r.amount,
+        date: r.createdAt,
+        description: `Salary Payment: ${r.trainerName} - ${new Date(r.month + '-01').toLocaleString('en-US', { month: 'long', year: 'numeric' })} Salary`,
+        paymentMethod: 'cash' as any,
+        status: 'paid',
+        notes: r.notes ?? null,
+        receiptUrl: null,
+        createdBy: null,
+        updatedBy: null,
+        createdAt: r.createdAt,
+        updatedAt: r.createdAt,
+        deletedAt: null,
+        deletedBy: null,
+        deletedReason: null,
+      })) as any;
+    }
+
+    // Merge and sort by date descending
+    const all = [...regularRows, ...salaryRows];
+    all.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return all;
+  }
+
+  async getExpense(id: string): Promise<Expense | undefined> {
+    const [expense] = await db.select().from(expenses).where(and(eq(expenses.id, id), isNull(expenses.deletedAt)));
+    return expense || undefined;
+  }
+
+  async createExpense(expense: InsertExpense, reqContext?: { ipAddress?: string; userAgent?: string }): Promise<Expense> {
+    const id = nanoid();
+    await db.insert(expenses).values({ ...expense, id } as any);
+    const [created] = await db.select().from(expenses).where(eq(expenses.id, id));
+    
+    // Activity log
+    await this.logActivity({
+      entityType: 'expense',
+      entityId: id,
+      action: 'created',
+      description: `Expense created: ${expense.category} - ${expense.amount}`,
+      metadata: JSON.stringify({ category: expense.category, amount: expense.amount, paymentMethod: expense.paymentMethod }),
+      performedBy: expense.createdBy || null,
+      ipAddress: reqContext?.ipAddress,
+      userAgent: reqContext?.userAgent,
+    });
+    
+    return created;
+  }
+
+  async updateExpense(id: string, expenseUpdate: Partial<typeof expenses.$inferInsert>, reqContext?: { ipAddress?: string; userAgent?: string }): Promise<Expense | undefined> {
+    // Get original for audit — only non-deleted records
+    const [original] = await db.select().from(expenses).where(and(eq(expenses.id, id), isNull(expenses.deletedAt)));
+    if (!original) return undefined;
+
+    await db.update(expenses).set({ ...expenseUpdate, updatedAt: new Date() }).where(and(eq(expenses.id, id), isNull(expenses.deletedAt)));
+    const [expense] = await db.select().from(expenses).where(and(eq(expenses.id, id), isNull(expenses.deletedAt)));
+    
+    // Activity log
+    await this.logActivity({
+      entityType: 'expense',
+      entityId: id,
+      action: 'updated',
+      description: `Expense updated: ${expense?.category}`,
+      metadata: JSON.stringify({ before: { amount: original?.amount, category: original?.category }, after: { amount: expense?.amount, category: expense?.category } }),
+      performedBy: expenseUpdate.updatedBy || null,
+      ipAddress: reqContext?.ipAddress,
+      userAgent: reqContext?.userAgent,
+    });
+    
+    return expense || undefined;
+  }
+
+  async deleteExpense(id: string, userId?: string, reason?: string, reqContext?: { ipAddress?: string; userAgent?: string }): Promise<boolean> {
+    // Soft delete
+    const [original] = await db.select().from(expenses).where(eq(expenses.id, id));
+    if (!original) return false;
+    
+    await db.update(expenses).set({
+      deletedAt: new Date(),
+      deletedBy: userId || null,
+      deletedReason: reason || 'Deleted by user',
+      updatedAt: new Date(),
+    } as any).where(eq(expenses.id, id));
+    
+    // Activity log
+    await this.logActivity({
+      entityType: 'expense',
+      entityId: id,
+      action: 'deleted',
+      description: `Expense soft-deleted: ${original.category} - ${original.amount}`,
+      metadata: JSON.stringify({ category: original.category, amount: original.amount, reason }),
+      performedBy: userId || null,
+      ipAddress: reqContext?.ipAddress,
+      userAgent: reqContext?.userAgent,
+    });
+    
+    return true;
+  }
+
+  // ─── Inventory Methods ────────────────────────────────────────────────────
+  async getInventoryItems(filters?: { category?: string }): Promise<InventoryItem[]> {
+    const conditions: any[] = [isNull(inventoryItems.deletedAt)]; // Always exclude soft-deleted
+    
+    if (filters?.category && filters.category !== 'all') {
+      conditions.push(eq(inventoryItems.category, filters.category));
+    }
+    
+    return await db.select().from(inventoryItems)
+      .where(and(...conditions))
+      .orderBy(asc(inventoryItems.name));
+  }
+
+  async getInventoryItem(id: string): Promise<InventoryItem | undefined> {
+    const [item] = await db.select().from(inventoryItems).where(and(eq(inventoryItems.id, id), isNull(inventoryItems.deletedAt)));
+    return item || undefined;
+  }
+
+  async createInventoryItem(item: InsertInventoryItem, reqContext?: { ipAddress?: string; userAgent?: string }): Promise<InventoryItem> {
+    const id = nanoid();
+    // Do not allow passing quantity directly to bypass transactions
+    const safeItem = { ...item, quantity: 0, status: 'out_of_stock', id };
+    await db.insert(inventoryItems).values(safeItem as any);
+    const [created] = await db.select().from(inventoryItems).where(eq(inventoryItems.id, id));
+    
+    // Activity log
+    await this.logActivity({
+      entityType: 'inventory_item',
+      entityId: id,
+      action: 'created',
+      description: `Inventory item created: ${item.name}`,
+      metadata: JSON.stringify({ name: item.name, category: item.category, unitPrice: item.unitPrice }),
+      performedBy: item.createdBy || null,
+      ipAddress: reqContext?.ipAddress,
+      userAgent: reqContext?.userAgent,
+    });
+    
+    return created;
+  }
+
+  async updateInventoryItem(id: string, itemUpdate: Partial<typeof inventoryItems.$inferInsert>, reqContext?: { ipAddress?: string; userAgent?: string }): Promise<InventoryItem | undefined> {
+    // Prevent direct quantity update — must go through transactions
+    const { quantity, status, ...safeUpdate } = itemUpdate as any;
+    
+    // Get original for audit
+    const [original] = await db.select().from(inventoryItems).where(eq(inventoryItems.id, id));
+    
+    await db.update(inventoryItems).set({ ...safeUpdate, updatedAt: new Date() }).where(eq(inventoryItems.id, id));
+    const [item] = await db.select().from(inventoryItems).where(eq(inventoryItems.id, id));
+    
+    // Activity log
+    await this.logActivity({
+      entityType: 'inventory_item',
+      entityId: id,
+      action: 'updated',
+      description: `Inventory item updated: ${item?.name}`,
+      metadata: JSON.stringify({ before: { name: original?.name, unitPrice: original?.unitPrice }, after: { name: item?.name, unitPrice: item?.unitPrice } }),
+      performedBy: (itemUpdate as any).updatedBy || null,
+      ipAddress: reqContext?.ipAddress,
+      userAgent: reqContext?.userAgent,
+    });
+    
+    return item || undefined;
+  }
+
+  async deleteInventoryItem(id: string, userId?: string, reason?: string, reqContext?: { ipAddress?: string; userAgent?: string }): Promise<boolean> {
+    // Soft delete — keep transaction history
+    const [original] = await db.select().from(inventoryItems).where(eq(inventoryItems.id, id));
+    if (!original) return false;
+    
+    await db.update(inventoryItems).set({
+      status: 'discontinued',
+      deletedAt: new Date(),
+      deletedBy: userId || null,
+      deletedReason: reason || 'Deleted by user',
+      updatedAt: new Date(),
+    } as any).where(eq(inventoryItems.id, id));
+    
+    // Activity log
+    await this.logActivity({
+      entityType: 'inventory_item',
+      entityId: id,
+      action: 'deleted',
+      description: `Inventory item soft-deleted: ${original.name}`,
+      metadata: JSON.stringify({ name: original.name, quantity: original.quantity, reason }),
+      performedBy: userId || null,
+      ipAddress: reqContext?.ipAddress,
+      userAgent: reqContext?.userAgent,
+    });
+    
+    return true;
+  }
+
+  async getInventoryTransactions(itemId?: string): Promise<InventoryTransaction[]> {
+    const conditions: any[] = [isNull(inventoryTransactions.deletedAt)];
+    if (itemId) {
+      conditions.push(eq(inventoryTransactions.itemId, itemId));
+    }
+    return await db.select().from(inventoryTransactions)
+      .where(and(...conditions))
+      .orderBy(desc(inventoryTransactions.transactionDate));
+  }
+
+  async createInventoryTransaction(
+    transaction: InsertInventoryTransaction,
+    expenseData?: { createExpense: boolean; unitCost: number; category: string; paymentMethod: string },
+    reqContext?: { ipAddress?: string; userAgent?: string }
+  ): Promise<InventoryTransaction> {
+    const id = nanoid();
+
+    // Safety: adjustment transactions MUST have notes
+    if (transaction.type === 'adjustment' && (!transaction.notes || transaction.notes.trim() === '')) {
+      throw new Error('Adjustment transactions require notes explaining the reason');
+    }
+
+    await db.transaction(async (tx) => {
+      // 1. Fetch item inside transaction with row-level lock
+      const items = await tx.select()
+        .from(inventoryItems)
+        .where(and(eq(inventoryItems.id, transaction.itemId), isNull(inventoryItems.deletedAt)))
+        .for('update');
+      
+      const item = items[0];
+      if (!item) {
+        throw new Error('Inventory item not found');
+      }
+
+      // 2. Validate transaction and compute new quantity
+      let newQuantity = item.quantity;
+      const transQty = transaction.quantity;
+
+      if (transaction.type === 'in') {
+        if (transQty <= 0) throw new Error('Stock in quantity must be positive');
+        newQuantity += transQty;
+      } else if (transaction.type === 'out') {
+        if (transQty <= 0) throw new Error('Stock out quantity must be positive');
+        if (transQty > item.quantity) {
+          throw new Error(`Insufficient stock. Available: ${item.quantity}, Requested: ${transQty}`);
+        }
+        newQuantity -= transQty;
+      } else if (transaction.type === 'adjustment') {
+        // Adjustment quantity is the *difference* (can be negative)
+        newQuantity += transQty;
+        if (newQuantity < 0) {
+          throw new Error('Adjustment would result in negative stock');
+        }
+      }
+
+      // 3. Auto-determine inventory status based on new quantity
+      let newStatus: string = 'active';
+      if (newQuantity <= 0) newStatus = 'out_of_stock';
+      else if (newQuantity <= item.minQuantity) newStatus = 'low_stock';
+
+      // 4. Insert transaction with audit fields
+      await tx.insert(inventoryTransactions).values({
+        ...transaction,
+        id,
+        balanceAfter: newQuantity,
+        // Prefer the caller-supplied cost (user's purchase price); fall back to item's reference price
+        unitCostAtTransaction: (transaction as any).unitCostAtTransaction || item.unitPrice || null,
+      } as any);
+      
+      // 5. Update item quantity AND status atomically
+      await tx.update(inventoryItems).set({
+        quantity: newQuantity,
+        status: newStatus,
+        updatedAt: new Date(),
+      } as any).where(eq(inventoryItems.id, transaction.itemId));
+
+      // 6. Create related expense inside transaction
+      if (expenseData?.createExpense && transaction.type === 'in' && transQty > 0) {
+        if (expenseData.unitCost > 0) {
+          const amount = transQty * expenseData.unitCost;
+          const expenseId = nanoid();
+          
+          await tx.insert(expenses).values({
+            id: expenseId,
+            category: expenseData.category || 'equipment',
+            amount: amount.toString(),
+            date: new Date(),
+            description: `Inventory Purchase: ${item.name} (${transQty} units)`,
+            paymentMethod: expenseData.paymentMethod || 'cash',
+            status: 'paid',
+            createdBy: transaction.createdBy || null,
+          } as any);
+
+          // Log expense creation
+          await tx.insert(activityLogs).values({
+            id: nanoid(),
+            entityType: 'expense',
+            entityId: expenseId,
+            action: 'created',
+            description: `Expense created via inventory stock-in: ${expenseData.category} - ${amount}`,
+            metadata: JSON.stringify({ category: expenseData.category, amount: amount.toString(), paymentMethod: expenseData.paymentMethod, relatedInventoryTx: id }),
+            performedBy: transaction.createdBy || null,
+            ipAddress: reqContext?.ipAddress,
+            userAgent: reqContext?.userAgent,
+            createdAt: new Date(),
+          } as any);
+        }
+      }
+    });
+
+    // Activity log (outside transaction for non-critical path)
+    const actionType = transaction.type === 'in' ? 'stock_in' : transaction.type === 'out' ? 'stock_out' : 'adjustment';
+    await this.logActivity({
+      entityType: 'inventory_transaction',
+      entityId: id,
+      action: actionType,
+      description: `${actionType.replace('_', ' ')} of ${transaction.quantity} units for item ${transaction.itemId}`,
+      metadata: JSON.stringify({ itemId: transaction.itemId, type: transaction.type, quantity: transaction.quantity, reference: transaction.reference }),
+      performedBy: transaction.createdBy || null,
+      ipAddress: reqContext?.ipAddress,
+      userAgent: reqContext?.userAgent,
+    });
+
+    const [t] = await db.select().from(inventoryTransactions).where(eq(inventoryTransactions.id, id));
+    return t;
+  }
+
+  // ─── Activity Log Methods ─────────────────────────────────────────────────
+  async logActivity(log: InsertActivityLog & { ipAddress?: string; userAgent?: string }): Promise<void> {
+    try {
+      const id = nanoid();
+      await db.insert(activityLogs).values({ ...log, id } as any);
+    } catch (err) {
+      // Activity logging should never break the main operation
+      console.error('Failed to log activity:', err);
+    }
+  }
+
+  async getActivityLogs(filters?: { entityType?: string; limit?: number; offset?: number }): Promise<{ logs: ActivityLog[]; total: number }> {
+    const conditions: any[] = [];
+    
+    if (filters?.entityType && filters.entityType !== 'all') {
+      conditions.push(eq(activityLogs.entityType, filters.entityType));
+    }
+
+    const limit = filters?.limit || 50;
+    const offset = filters?.offset || 0;
+
+    // Get total count
+    const countQuery = db.select({ count: sql<number>`COUNT(*)` }).from(activityLogs);
+    if (conditions.length > 0) {
+      (countQuery as any).where(and(...conditions));
+    }
+    const [countResult] = await countQuery;
+    const total = Number(countResult?.count || 0);
+
+    // Get paginated results
+    let query = db.select().from(activityLogs);
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+    const logs = await query
+      .orderBy(desc(activityLogs.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    return { logs, total };
+  }
+
+  // ─── Dashboard Chart Data Methods ─────────────────────────────────────────
+  async getExpenseTrends(): Promise<Array<{ month: string; total: string }>> {
+    const result = await db.execute(
+      sql`SELECT DATE_FORMAT(date, '%Y-%m') as month, 
+          CAST(SUM(amount) AS CHAR) as total 
+          FROM expenses 
+          WHERE deleted_at IS NULL 
+          AND date >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH)
+          GROUP BY DATE_FORMAT(date, '%Y-%m') 
+          ORDER BY month ASC`
+    );
+    return (result[0] as unknown as any[]).map((r: any) => ({ month: r.month, total: r.total || '0' }));
+  }
+
+  async getExpenseCategories(): Promise<Array<{ category: string; total: string }>> {
+    const result = await db.execute(
+      sql`SELECT category, 
+          CAST(SUM(amount) AS CHAR) as total 
+          FROM expenses 
+          WHERE deleted_at IS NULL 
+          AND DATE_FORMAT(date, '%Y-%m') = DATE_FORMAT(CURDATE(), '%Y-%m')
+          GROUP BY category 
+          ORDER BY SUM(amount) DESC`
+    );
+    return (result[0] as unknown as any[]).map((r: any) => ({ category: r.category, total: r.total || '0' }));
+  }
+
+  async getInventoryMovements(): Promise<Array<{ month: string; stockIn: number; stockOut: number; adjustment: number }>> {
+    const result = await db.execute(
+      sql`SELECT DATE_FORMAT(transaction_date, '%Y-%m') as month,
+          SUM(CASE WHEN type = 'in' THEN quantity ELSE 0 END) as stock_in,
+          SUM(CASE WHEN type = 'out' THEN quantity ELSE 0 END) as stock_out,
+          SUM(CASE WHEN type = 'adjustment' THEN ABS(quantity) ELSE 0 END) as adjustment
+          FROM inventory_transactions 
+          WHERE deleted_at IS NULL 
+          AND transaction_date >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH)
+          GROUP BY DATE_FORMAT(transaction_date, '%Y-%m') 
+          ORDER BY month ASC`
+    );
+    return (result[0] as unknown as any[]).map((r: any) => ({
+      month: r.month,
+      stockIn: Number(r.stock_in || 0),
+      stockOut: Number(r.stock_out || 0),
+      adjustment: Number(r.adjustment || 0),
+    }));
+  }
 }
 
 export const storage = new DatabaseStorage();
+

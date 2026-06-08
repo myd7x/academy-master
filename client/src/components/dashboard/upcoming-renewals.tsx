@@ -1,11 +1,17 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { User } from "lucide-react";
 import { ACTIVITIES } from "@/lib/constants";
 import { format } from "date-fns";
+import ViewPlayerModal from "@/components/modals/view-player-modal";
+import RenewPlayerModal from "@/components/modals/renew-player-modal";
 
 export default function UpcomingRenewals() {
+  const [renewPlayerId, setRenewPlayerId] = useState<string | null>(null);
+  const [contactPlayerId, setContactPlayerId] = useState<string | null>(null);
+
   const { data: renewals, isLoading } = useQuery({
     queryKey: ["/api/dashboard/upcoming-renewals"],
   });
@@ -24,6 +30,7 @@ export default function UpcomingRenewals() {
   }
 
   return (
+    <>
     <Card>
       <CardHeader>
         <CardTitle>Upcoming Renewals</CardTitle>
@@ -109,10 +116,18 @@ export default function UpcomingRenewals() {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                      <Button variant="link" className="text-academy-blue hover:text-academy-blue-light p-0">
+                      <Button
+                        variant="link"
+                        className="text-academy-blue hover:text-academy-blue-light p-0"
+                        onClick={() => setRenewPlayerId(player.id)}
+                      >
                         Renew
                       </Button>
-                      <Button variant="link" className="text-gray-600 hover:text-gray-900 p-0">
+                      <Button
+                        variant="link"
+                        className="text-gray-600 hover:text-gray-900 p-0"
+                        onClick={() => setContactPlayerId(player.id)}
+                      >
                         Contact
                       </Button>
                     </td>
@@ -124,6 +139,18 @@ export default function UpcomingRenewals() {
         </div>
       </CardContent>
     </Card>
+
+    <RenewPlayerModal
+      open={!!renewPlayerId}
+      onOpenChange={(open) => { if (!open) setRenewPlayerId(null); }}
+      playerId={renewPlayerId}
+    />
+    <ViewPlayerModal
+      open={!!contactPlayerId}
+      onOpenChange={(open) => { if (!open) setContactPlayerId(null); }}
+      playerId={contactPlayerId}
+    />
+  </>
   );
 }
 

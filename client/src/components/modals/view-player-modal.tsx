@@ -507,7 +507,7 @@ export default function ViewPlayerModal({ open, onOpenChange, playerId }: ViewPl
               <div className="flex items-center space-x-3">
                 <DollarSign className="h-5 w-5 text-gray-400" />
                 <div>
-                  <p className="text-sm font-medium text-gray-900">${playerData.monthlySubscriptionFee}</p>
+                  <p className="text-sm font-medium text-gray-900">AED {playerData.monthlySubscriptionFee}</p>
                   <p className="text-sm text-gray-500">Monthly Fee</p>
                 </div>
               </div>
@@ -525,16 +525,16 @@ export default function ViewPlayerModal({ open, onOpenChange, playerId }: ViewPl
                     <div className="space-y-2">
                       <div className="flex justify-between text-sm">
                         <span className="text-gray-600">Total Due:</span>
-                        <span className="font-medium">${totalDue.toFixed(2)}</span>
+                        <span className="font-medium">AED {totalDue.toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between text-sm">
                         <span className="text-gray-600">Amount Paid:</span>
-                        <span className="font-medium text-green-600">${totalPaid.toFixed(2)}</span>
+                        <span className="font-medium text-green-600">AED {totalPaid.toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between text-sm border-t pt-2">
                         <span className="text-gray-600">Remaining Balance:</span>
                         <span className={`font-medium ${remainingBalance > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                          ${remainingBalance.toFixed(2)}
+                          AED {remainingBalance.toFixed(2)}
                         </span>
                       </div>
                       {/* Payment Progress Bar */}
@@ -590,16 +590,16 @@ export default function ViewPlayerModal({ open, onOpenChange, playerId }: ViewPl
                       <div className="grid grid-cols-3 gap-4 text-center">
                         <div>
                           <p className="text-sm text-gray-600">Total Paid</p>
-                          <p className="text-lg font-semibold text-green-600">${totalPaid.toFixed(2)}</p>
+                          <p className="text-lg font-semibold text-green-600">AED {totalPaid.toFixed(2)}</p>
                         </div>
                         <div>
                           <p className="text-sm text-gray-600">Subscription Fee</p>
-                          <p className="text-lg font-semibold text-gray-900">${subscriptionFee.toFixed(2)}</p>
+                          <p className="text-lg font-semibold text-gray-900">AED {subscriptionFee.toFixed(2)}</p>
                         </div>
                         <div>
                           <p className="text-sm text-gray-600">Balance</p>
                           <p className={`text-lg font-semibold ${remainingBalance > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                            ${remainingBalance.toFixed(2)}
+                            AED {remainingBalance.toFixed(2)}
                           </p>
                         </div>
                       </div>

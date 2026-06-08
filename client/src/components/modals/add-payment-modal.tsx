@@ -184,16 +184,16 @@ export default function AddPaymentModal({ open, onOpenChange, selectedPlayerId }
                   <div className="space-y-1 text-sm">
                     <div className="flex justify-between">
                       <span>Monthly Subscription Fee:</span>
-                      <span className="font-medium">${subscriptionFee.toFixed(2)}</span>
+                      <span className="font-medium">AED {subscriptionFee.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Total Paid So Far:</span>
-                      <span className="font-medium">${totalPaidSoFar.toFixed(2)}</span>
+                      <span className="font-medium">AED {totalPaidSoFar.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between border-t pt-1">
                       <span>Remaining Balance:</span>
                       <span className={`font-medium ${remainingBalance > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                        ${remainingBalance.toFixed(2)}
+                        AED {remainingBalance.toFixed(2)}
                       </span>
                     </div>
                   </div>
@@ -213,7 +213,7 @@ export default function AddPaymentModal({ open, onOpenChange, selectedPlayerId }
                               <div className="text-gray-500">{p.receiptNumber}</div>
                             </div>
                             <div className="text-right">
-                              <div className="font-bold text-green-600">${p.amountPaid}</div>
+                              <div className="font-bold text-green-600">AED {p.amountPaid}</div>
                               <div className="text-gray-500">{PAYMENT_METHODS[p.paymentMethod as keyof typeof PAYMENT_METHODS]?.label || p.paymentMethod}</div>
                             </div>
                           </div>
@@ -231,7 +231,7 @@ export default function AddPaymentModal({ open, onOpenChange, selectedPlayerId }
                 name="amountPaid"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Amount Paid ($) *</FormLabel>
+                    <FormLabel>Amount Paid (AED) *</FormLabel>
                     <FormControl>
                       <Input 
                         type="number" 

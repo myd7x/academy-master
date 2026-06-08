@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import StatsCards from "@/components/dashboard/stats-cards";
+import DashboardCharts from "@/components/dashboard/dashboard-charts";
 import ActivityOverview from "@/components/dashboard/activity-overview";
 import RecentActivities from "@/components/dashboard/recent-activities";
 import UpcomingRenewals from "@/components/dashboard/upcoming-renewals";
@@ -61,6 +62,7 @@ export default function Dashboard() {
       <main className="flex-1 overflow-x-hidden overflow-y-auto gradient-bg p-4 sm:p-8">
         <div className="space-y-6 sm:space-y-8 animate-fade-in max-w-7xl mx-auto">
           <StatsCards />
+          <DashboardCharts />
           
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
             <ActivityOverview />

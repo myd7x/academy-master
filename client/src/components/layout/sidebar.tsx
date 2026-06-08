@@ -7,7 +7,9 @@ import {
   User,
   LogOut,
   GraduationCap,
-  X
+  X,
+  Wallet,
+  Package
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -18,6 +20,8 @@ const navigation = [
   { name: "Payments", href: "/payments", icon: CreditCard },
   { name: "Sessions", href: "/sessions", icon: CalendarCheck },
   { name: "Trainers", href: "/trainers", icon: GraduationCap },
+  { name: "Expenses", href: "/expenses", icon: Wallet },
+  { name: "Inventory", href: "/inventory", icon: Package },
 ];
 
 interface SidebarProps {
