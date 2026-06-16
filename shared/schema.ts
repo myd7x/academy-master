@@ -84,7 +84,7 @@ export const INVENTORY_TRANSACTION_TYPE_VALUES = [
 
 // Users table for admin authentication
 export const users = mysqlTable("users", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`uuid()`),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
   username: varchar("username", { length: 255 }).notNull().unique(),
   password: text("password").notNull(), // Hashed password
   role: varchar("role", { length: 20 }).notNull().default('admin'), // RBAC role
@@ -93,7 +93,7 @@ export const users = mysqlTable("users", {
 
 // Players table
 export const players = mysqlTable("players", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`uuid()`),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
   fullName: text("full_name").notNull(),
   dateOfBirth: date("date_of_birth").notNull(),
   phoneNumber: text("phone_number"),
@@ -106,7 +106,7 @@ export const players = mysqlTable("players", {
 
 // Subscriptions table (New Architecture)
 export const subscriptions = mysqlTable("subscriptions", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`uuid()`),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
   playerId: varchar("player_id", { length: 36 }).notNull().references(() => players.id, { onDelete: 'cascade' }),
   activity: mysqlEnum("activity", ACTIVITY_VALUES).notNull(),
   startDate: datetime("start_date", { mode: 'date' }).notNull(),
@@ -126,7 +126,7 @@ export const subscriptions = mysqlTable("subscriptions", {
 
 // Player documents table
 export const playerDocuments = mysqlTable("player_documents", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`uuid()`),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
   playerId: varchar("player_id", { length: 36 }).notNull().references(() => players.id, { onDelete: 'cascade' }),
   documentType: text("document_type").notNull(),
   fileName: text("file_name").notNull(),
@@ -138,7 +138,7 @@ export const playerDocuments = mysqlTable("player_documents", {
 
 // Payments table — paymentStatus is VARCHAR(30) so we can add new statuses without ALTER TABLE ENUM
 export const payments = mysqlTable("payments", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`uuid()`),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
   playerId: varchar("player_id", { length: 36 }).notNull().references(() => players.id, { onDelete: 'cascade' }),
   subscriptionFee: decimal("subscription_fee", { precision: 10, scale: 2 }).notNull(),
   amountPaid: decimal("amount_paid", { precision: 10, scale: 2 }).notNull(),
@@ -157,7 +157,7 @@ export const payments = mysqlTable("payments", {
 
 // Payment Refunds table — each row is an individual reversal record, never modifies original payment amounts
 export const paymentRefunds = mysqlTable("payment_refunds", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`uuid()`),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
   paymentId: varchar("payment_id", { length: 36 }).notNull().references(() => payments.id, { onDelete: 'cascade' }),
   playerId: varchar("player_id", { length: 36 }).notNull().references(() => players.id, { onDelete: 'cascade' }),
   refundAmount: decimal("refund_amount", { precision: 10, scale: 2 }).notNull(),
@@ -171,7 +171,7 @@ export const paymentRefunds = mysqlTable("payment_refunds", {
 
 // Payment History/Archive table for old payment records
 export const paymentHistory = mysqlTable("payment_history", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`uuid()`),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
   playerId: varchar("player_id", { length: 36 }).notNull().references(() => players.id, { onDelete: 'cascade' }),
   subscriptionFee: decimal("subscription_fee", { precision: 10, scale: 2 }).notNull(),
   amountPaid: decimal("amount_paid", { precision: 10, scale: 2 }).notNull(),
@@ -188,7 +188,7 @@ export const paymentHistory = mysqlTable("payment_history", {
 });
 
 export const paymentRefundHistory = mysqlTable("payment_refund_history", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`uuid()`),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
   originalRefundId: varchar("original_refund_id", { length: 36 }).notNull(),
   paymentHistoryId: varchar("payment_history_id", { length: 36 }).notNull().references(() => paymentHistory.id, { onDelete: 'cascade' }),
   playerId: varchar("player_id", { length: 36 }).notNull().references(() => players.id, { onDelete: 'cascade' }),
@@ -203,7 +203,7 @@ export const paymentRefundHistory = mysqlTable("payment_refund_history", {
 
 // Sessions table
 export const sessions = mysqlTable("sessions", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`uuid()`),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
   playerId: varchar("player_id", { length: 36 }).notNull().references(() => players.id, { onDelete: 'cascade' }),
   subscriptionId: varchar("subscription_id", { length: 36 }).notNull().references(() => subscriptions.id, { onDelete: 'cascade' }),
   sessionDate: datetime("session_date", { mode: 'date' }).notNull(),
@@ -297,7 +297,7 @@ export const sessionsRelations = relations(sessions, ({ one }) => ({
 export const TRAINER_ADVANCE_STATUS_VALUES = ['pending', 'deducted', 'repaid'] as const;
 
 export const trainers = mysqlTable("trainers", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`uuid()`),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
   name: text("name").notNull(),
   activity: mysqlEnum("activity", ACTIVITY_VALUES).notNull(),
   baseSalary: decimal("base_salary", { precision: 10, scale: 2 }).notNull().default('0'),
@@ -305,7 +305,7 @@ export const trainers = mysqlTable("trainers", {
 });
 
 export const trainerSalaryPayments = mysqlTable("trainer_salary_payments", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`uuid()`),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
   trainerId: varchar("trainer_id", { length: 36 }).notNull().references(() => trainers.id, { onDelete: 'cascade' }),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   month: varchar("month", { length: 7 }).notNull(), // YYYY-MM
@@ -314,7 +314,7 @@ export const trainerSalaryPayments = mysqlTable("trainer_salary_payments", {
 });
 
 export const trainerAdvances = mysqlTable("trainer_advances", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`uuid()`),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
   trainerId: varchar("trainer_id", { length: 36 }).notNull().references(() => trainers.id, { onDelete: 'cascade' }),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   remainingBalance: decimal("remaining_balance", { precision: 10, scale: 2 }).notNull(),
@@ -326,7 +326,7 @@ export const trainerAdvances = mysqlTable("trainer_advances", {
 });
 
 export const trainerAdvanceRepayments = mysqlTable("trainer_advance_repayments", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`uuid()`),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
   advanceId: varchar("advance_id", { length: 36 }).notNull().references(() => trainerAdvances.id, { onDelete: 'restrict' }),
   payrollId: varchar("payroll_id", { length: 36 }),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
@@ -334,7 +334,7 @@ export const trainerAdvanceRepayments = mysqlTable("trainer_advance_repayments",
 });
 
 export const trainerBonuses = mysqlTable("trainer_bonuses", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`uuid()`),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
   trainerId: varchar("trainer_id", { length: 36 }).notNull().references(() => trainers.id, { onDelete: 'cascade' }),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   month: varchar("month", { length: 7 }).notNull(), // YYYY-MM
@@ -345,7 +345,7 @@ export const trainerBonuses = mysqlTable("trainer_bonuses", {
 export const TRAINER_PAYROLL_STATUS_VALUES = ['unpaid', 'partial', 'paid', 'over_advanced'] as const;
 
 export const trainerPayrolls = mysqlTable("trainer_payrolls", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`uuid()`),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
   trainerId: varchar("trainer_id", { length: 36 }).notNull().references(() => trainers.id, { onDelete: 'cascade' }),
   month: varchar("month", { length: 7 }).notNull(), // YYYY-MM
   baseSalary: decimal("base_salary", { precision: 10, scale: 2 }).notNull().default('0'),
@@ -365,7 +365,7 @@ export const trainerPayrolls = mysqlTable("trainer_payrolls", {
 // ─── Expenses ─────────────────────────────────────────────────────────────
 
 export const expenses = mysqlTable("expenses", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`uuid()`),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
   category: mysqlEnum("category", EXPENSE_CATEGORY_VALUES).notNull(),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   date: timestamp("date").notNull().defaultNow(),
@@ -387,7 +387,7 @@ export const expenses = mysqlTable("expenses", {
 // ─── Inventory ────────────────────────────────────────────────────────────
 
 export const inventoryItems = mysqlTable("inventory_items", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`uuid()`),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
   name: text("name").notNull(),
   sku: varchar("sku", { length: 100 }).unique(),
   category: text("category").notNull(), // tools, apparel, consumables, equipment
@@ -409,7 +409,7 @@ export const inventoryItems = mysqlTable("inventory_items", {
 });
 
 export const inventoryTransactions = mysqlTable("inventory_transactions", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`uuid()`),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
   itemId: varchar("item_id", { length: 36 }).notNull().references(() => inventoryItems.id, { onDelete: 'cascade' }),
   type: mysqlEnum("type", INVENTORY_TRANSACTION_TYPE_VALUES).notNull(),
   quantity: int11("quantity").notNull(),
@@ -429,7 +429,7 @@ export const inventoryTransactions = mysqlTable("inventory_transactions", {
 // ─── Activity Logs ────────────────────────────────────────────────────────
 
 export const activityLogs = mysqlTable("activity_logs", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`uuid()`),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
   entityType: varchar("entity_type", { length: 50 }).notNull(),
   entityId: varchar("entity_id", { length: 36 }).notNull(),
   action: varchar("action", { length: 30 }).notNull(),
@@ -444,7 +444,7 @@ export const activityLogs = mysqlTable("activity_logs", {
 // ─── Accounting Periods ───────────────────────────────────────────────────
 
 export const accountingPeriods = mysqlTable("accounting_periods", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`uuid()`),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
   yearMonth: varchar("year_month", { length: 7 }).notNull().unique(), // YYYY-MM
   isClosed: boolean("is_closed").notNull().default(false),
   closedAt: timestamp("closed_at"),
@@ -455,7 +455,7 @@ export const accountingPeriods = mysqlTable("accounting_periods", {
 // ─── Audit Trail ──────────────────────────────────────────────────────────
 
 export const auditLogs = mysqlTable("audit_logs", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`uuid()`),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
   tableName: varchar("table_name", { length: 64 }).notNull(),
   recordId: varchar("record_id", { length: 36 }).notNull(),
   action: varchar("action", { length: 20 }).notNull(), // INSERT, UPDATE, DELETE
