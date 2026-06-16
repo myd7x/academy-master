@@ -59,7 +59,7 @@ export default function Dashboard() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-x-hidden overflow-y-auto gradient-bg p-4 sm:p-8">
+      <main className="flex-1 overflow-x-hidden overflow-y-auto bg-white p-4 sm:p-8">
         <div className="space-y-6 sm:space-y-8 animate-fade-in max-w-7xl mx-auto">
           <StatsCards />
           <DashboardCharts />

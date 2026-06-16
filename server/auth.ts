@@ -5,7 +5,9 @@ import session from "express-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { storage } from "./storage";
-import { User as SelectUser } from "@shared/schema";
+import { User as SelectUser, users } from "@shared/schema";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
 import createMemoryStore from "memorystore";
 
 const MemoryStore = createMemoryStore(session);
@@ -18,7 +20,7 @@ declare global {
 
 const scryptAsync = promisify(scrypt);
 
-async function hashPassword(password: string) {
+export async function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
   const buf = (await scryptAsync(password, salt, 64)) as Buffer;
   return `${buf.toString("hex")}.${salt}`;
@@ -31,10 +33,30 @@ async function comparePasswords(supplied: string, stored: string) {
   return timingSafeEqual(hashedBuf, suppliedBuf);
 }
 
+export function requireRole(roles: string[]) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Not authenticated" });
+    if (!req.user || !roles.includes((req.user as any).role)) {
+      return res.status(403).json({ message: "Forbidden: insufficient permissions" });
+    }
+    next();
+  };
+}
+
 export async function setupAuth(app: Express) {
-  // Admin credentials handled dynamically exclusively in memory
   const ADMIN_USERNAME = "admin";
   const ADMIN_PASSWORD = "maged";
+
+  try {
+    const existingAdmins = await db.select().from(users).where(eq(users.username, ADMIN_USERNAME));
+    if (existingAdmins.length === 0) {
+      const hashed = await hashPassword(ADMIN_PASSWORD);
+      await db.insert(users).values({ username: ADMIN_USERNAME, password: hashed, role: 'admin' });
+      console.log("Seeded default admin user");
+    }
+  } catch (err) {
+    console.error("Failed to seed admin user:", err);
+  }
 
   const sessionSettings: session.SessionOptions = {
     secret: process.env.SESSION_SECRET || "academy-flow-secret",
@@ -60,10 +82,11 @@ export async function setupAuth(app: Express) {
   passport.use(
     new LocalStrategy(async (username, password, done) => {
       try {
-        if (username !== ADMIN_USERNAME || password !== ADMIN_PASSWORD) {
+        const [user] = await db.select().from(users).where(eq(users.username, username));
+        if (!user || !(await comparePasswords(password, user.password))) {
           return done(null, false, { message: "Invalid username or password" });
         }
-        return done(null, { id: "admin-id", username: ADMIN_USERNAME } as Express.User);
+        return done(null, user as Express.User);
       } catch (error) {
         return done(error);
       }
@@ -73,11 +96,9 @@ export async function setupAuth(app: Express) {
   passport.serializeUser((user, done) => done(null, user.id));
   passport.deserializeUser(async (id: string, done) => {
     try {
-      if (id === "admin-id") {
-        done(null, { id: "admin-id", username: ADMIN_USERNAME } as Express.User);
-      } else {
-        done(null, false);
-      }
+      const [user] = await db.select().from(users).where(eq(users.id, id));
+      if (!user) return done(null, false);
+      done(null, user as Express.User);
     } catch (error) {
       done(error);
     }
@@ -91,7 +112,7 @@ export async function setupAuth(app: Express) {
       }
       req.login(user, (err) => {
         if (err) return next(err);
-        return res.json({ message: "Logged in successfully", user: { id: user.id, username: user.username } });
+        return res.json({ message: "Logged in successfully", user: { id: user.id, username: user.username, role: (user as any).role } });
       });
     })(req, res, next);
   });
@@ -105,7 +126,7 @@ export async function setupAuth(app: Express) {
 
   app.get("/api/user", (req, res) => {
     if (req.isAuthenticated()) {
-      return res.json({ id: req.user.id, username: req.user.username });
+      return res.json({ id: req.user.id, username: req.user.username, role: (req.user as any).role });
     }
     res.status(401).json({ message: "Not authenticated" });
   });

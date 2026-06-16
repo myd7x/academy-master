@@ -101,11 +101,10 @@ export default function PlayersTable({ searchTerm, activityFilter }: PlayersTabl
           </p>
         )}
         {filteredPlayers.map((player: any) => {
-          const activity =
-            ACTIVITIES[player.activity as keyof typeof ACTIVITIES];
-          const age =
-            new Date().getFullYear() -
-            new Date(player.dateOfBirth).getFullYear();
+          const activity = player.activity ? ACTIVITIES[player.activity as keyof typeof ACTIVITIES] : null;
+          const age = player.dateOfBirth 
+            ? new Date().getFullYear() - new Date(player.dateOfBirth).getFullYear()
+            : 0;
           return (
             <div key={player.id} className="p-4 space-y-3">
               {/* Row 1: avatar + name + status */}
@@ -123,9 +122,9 @@ export default function PlayersTable({ searchTerm, activityFilter }: PlayersTabl
                 </div>
                 <span
                   className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium shrink-0 ${
-                    SUBSCRIPTION_STATUS_COLORS[
+                    player.subscriptionStatus && SUBSCRIPTION_STATUS_COLORS[
                       player.subscriptionStatus as keyof typeof SUBSCRIPTION_STATUS_COLORS
-                    ]
+                    ] || "bg-gray-100 text-gray-800"
                   }`}
                 >
                   {player.subscriptionStatus === "active"
@@ -136,17 +135,17 @@ export default function PlayersTable({ searchTerm, activityFilter }: PlayersTabl
                     ? "Renewal"
                     : player.subscriptionStatus === "paused"
                     ? "Paused"
-                    : player.subscriptionStatus?.replace("_", " ")}
+                    : player.subscriptionStatus?.replace("_", " ") || "No Plan"}
                 </span>
               </div>
 
               {/* Row 2: activity + sessions */}
               <div className="flex items-center gap-3 text-xs text-gray-600">
                 <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-medium">
-                  {activity.emoji} {activity.label}
+                  {activity ? `${activity.emoji} ${activity.label}` : player.activity || 'No Activity'}
                 </span>
                 <span>
-                  {player.sessionsAttended}/{player.totalSessionsAllowed}{" "}
+                  {player.sessionsAttended || 0}/{player.totalSessionsAllowed || 8}{" "}
                   sessions
                 </span>
               </div>
@@ -228,11 +227,10 @@ export default function PlayersTable({ searchTerm, activityFilter }: PlayersTabl
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {filteredPlayers.map((player: any) => {
-              const activity =
-                ACTIVITIES[player.activity as keyof typeof ACTIVITIES];
-              const age =
-                new Date().getFullYear() -
-                new Date(player.dateOfBirth).getFullYear();
+              const activity = player.activity ? ACTIVITIES[player.activity as keyof typeof ACTIVITIES] : null;
+              const age = player.dateOfBirth
+                ? new Date().getFullYear() - new Date(player.dateOfBirth).getFullYear()
+                : 0;
 
               return (
                 <tr key={player.id}>
@@ -253,53 +251,59 @@ export default function PlayersTable({ searchTerm, activityFilter }: PlayersTabl
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                      {activity.emoji} {activity.label}
+                      {activity ? `${activity.emoji} ${activity.label}` : player.activity || 'No Activity'}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    <div>
-                      {format(
-                        new Date(player.subscriptionDate),
-                        "MMM dd, yyyy"
-                      )}{" "}
-                      -{" "}
-                      {format(
-                        new Date(
-                          player.subscriptionEndDate || player.renewalDate
-                        ),
-                        "MMM dd, yyyy"
-                      )}
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      {(() => {
-                        const startDate = new Date(player.subscriptionDate);
-                        const endDate = new Date(
-                          player.subscriptionEndDate || player.renewalDate
-                        );
-                        const diffTime = Math.abs(
-                          endDate.getTime() - startDate.getTime()
-                        );
-                        const diffDays = Math.ceil(
-                          diffTime / (1000 * 60 * 60 * 24)
-                        );
-                        if (diffDays <= 7)
-                          return `${diffDays} Day${diffDays > 1 ? "s" : ""} Plan`;
-                        if (diffDays <= 14)
-                          return `${Math.round(diffDays / 7)} Week${
-                            Math.round(diffDays / 7) > 1 ? "s" : ""
-                          } Plan`;
-                        return `${Math.round(diffDays / 30)} Month${
-                          Math.round(diffDays / 30) > 1 ? "s" : ""
-                        } Plan`;
-                      })()}
-                    </div>
+                    {player.subscriptionDate ? (
+                      <>
+                        <div>
+                          {format(
+                            new Date(player.subscriptionDate),
+                            "MMM dd, yyyy"
+                          )}{" "}
+                          -{" "}
+                          {format(
+                            new Date(
+                              player.subscriptionEndDate || player.renewalDate
+                            ),
+                            "MMM dd, yyyy"
+                          )}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {(() => {
+                            const startDate = new Date(player.subscriptionDate);
+                            const endDate = new Date(
+                              player.subscriptionEndDate || player.renewalDate
+                            );
+                            const diffTime = Math.abs(
+                              endDate.getTime() - startDate.getTime()
+                            );
+                            const diffDays = Math.ceil(
+                              diffTime / (1000 * 60 * 60 * 24)
+                            );
+                            if (diffDays <= 7)
+                              return `${diffDays} Day${diffDays > 1 ? "s" : ""} Plan`;
+                            if (diffDays <= 14)
+                              return `${Math.round(diffDays / 7)} Week${
+                                Math.round(diffDays / 7) > 1 ? "s" : ""
+                              } Plan`;
+                            return `${Math.round(diffDays / 30)} Month${
+                              Math.round(diffDays / 30) > 1 ? "s" : ""
+                            } Plan`;
+                          })()}
+                        </div>
+                      </>
+                    ) : (
+                      <span className="text-gray-400">No active plan</span>
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span
                       className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        SUBSCRIPTION_STATUS_COLORS[
+                        player.subscriptionStatus && SUBSCRIPTION_STATUS_COLORS[
                           player.subscriptionStatus as keyof typeof SUBSCRIPTION_STATUS_COLORS
-                        ]
+                        ] || "bg-gray-100 text-gray-800"
                       }`}
                     >
                       {player.subscriptionStatus === "active"
@@ -312,18 +316,18 @@ export default function PlayersTable({ searchTerm, activityFilter }: PlayersTabl
                         ? "Paused"
                         : player.subscriptionStatus === "cancelled"
                         ? "Cancelled"
-                        : player.subscriptionStatus?.replace("_", " ")}
+                        : player.subscriptionStatus?.replace("_", " ") || "No Plan"}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900">
-                      {player.sessionsAttended}/{player.totalSessionsAllowed}{" "}
+                      {player.sessionsAttended || 0}/{player.totalSessionsAllowed || 8}{" "}
                       attended
                     </div>
                     <div className="text-xs text-gray-500">
                       {Math.max(
                         0,
-                        player.totalSessionsAllowed - player.sessionsAttended
+                        (player.totalSessionsAllowed || 8) - (player.sessionsAttended || 0)
                       )}{" "}
                       remaining
                     </div>

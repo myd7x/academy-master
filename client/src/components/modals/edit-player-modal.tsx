@@ -231,8 +231,8 @@ export default function EditPlayerModal({ open, onOpenChange, player, defaultTab
 
   if (!player) return null;
 
-  const remainingSessions = player.totalSessionsAllowed - player.sessionsAttended;
-  const activity = ACTIVITIES[player.activity as keyof typeof ACTIVITIES];
+  const remainingSessions = (player.totalSessionsAllowed || 8) - (player.sessionsAttended || 0);
+  const activity = player.activity ? ACTIVITIES[player.activity as keyof typeof ACTIVITIES] : null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

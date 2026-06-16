@@ -1,11 +1,30 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage, ALLOWED_REFUND_METHODS } from "./storage";
-import { insertPlayerSchema, insertPaymentSchema, insertSessionSchema } from "@shared/schema";
+import { insertPlayerSchema, insertPaymentSchema, insertSessionSchema, subscriptions } from "@shared/schema";
+import { db } from "./db";
+import { eq, and } from "drizzle-orm";
 import { z } from "zod";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import { requireRole } from "./auth";
+// Rate limiting definitions moved to index.ts
+
+// File signature validation (Magic Bytes)
+function validateFileSignature(filePath: string): boolean {
+  try {
+    const fd = fs.openSync(filePath, 'r');
+    const buffer = Buffer.alloc(4);
+    fs.readSync(fd, buffer, 0, 4, 0);
+    fs.closeSync(fd);
+    const hex = buffer.toString('hex').toUpperCase();
+    // JPEG: FFD8FF, PNG: 89504E47, PDF: 25504446
+    return hex.startsWith('FFD8FF') || hex.startsWith('89504E47') || hex.startsWith('25504446');
+  } catch (err) {
+    return false;
+  }
+}
 
 // Configure multer for file uploads
 const uploadDir = path.join(process.cwd(), 'client/public/uploads');
@@ -54,8 +73,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     next();
   });
 
-  // Dashboard routes
-  app.get("/api/dashboard/stats", async (req, res) => {
+  // Dashboard routes - Require Admin Role
+  app.get("/api/dashboard/stats", requireRole(['admin']), async (req, res) => {
     try {
       const stats = await storage.getDashboardStats();
       res.json(stats);
@@ -175,15 +194,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         specialNotes: req.body.specialNotes || null,
       });
 
-      const player = await storage.createPlayer(playerData);
-
-      // Handle file uploads
-      const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+      const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
+      const documents: any[] = [];
       
-      if (files.idDocument) {
+      if (files?.idDocument) {
         const file = files.idDocument[0];
-        await storage.createPlayerDocument({
-          playerId: player.id,
+        documents.push({
           documentType: 'id',
           fileName: file.originalname,
           filePath: `/uploads/${file.filename}`,
@@ -192,10 +208,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      if (files.medicalForm) {
+      if (files?.medicalForm) {
         const file = files.medicalForm[0];
-        await storage.createPlayerDocument({
-          playerId: player.id,
+        documents.push({
           documentType: 'medical_form',
           fileName: file.originalname,
           filePath: `/uploads/${file.filename}`,
@@ -204,23 +219,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Create initial payment record if amount paid is provided and > 0
       const subscriptionFee = Array.isArray(req.body.subscriptionFee) ? req.body.subscriptionFee[0] : (req.body.subscriptionFee || "200");
       const amountPaidInput = Array.isArray(req.body.amountPaid) ? req.body.amountPaid[0] : (req.body.amountPaid || '0');
       const amountPaid = parseFloat(amountPaidInput);
-      
-      if (subscriptionFee && amountPaid > 0) {
-        const paymentData = {
-          playerId: player.id,
+      const parsedFee = parseFloat(subscriptionFee);
+
+      if (isNaN(parsedFee) || parsedFee < 0) {
+        return res.status(400).json({ message: "Subscription fee cannot be negative" });
+      }
+      if (isNaN(amountPaid) || amountPaid < 0) {
+        return res.status(400).json({ message: "Amount paid cannot be negative" });
+      }
+      if (amountPaid > parsedFee) {
+        return res.status(400).json({ message: "Amount paid cannot exceed subscription fee" });
+      }
+
+      let paymentData: any = undefined;
+      if (parsedFee > 0 && amountPaid > 0) {
+        paymentData = {
           subscriptionFee: subscriptionFee,
           amountPaid: amountPaid.toString(),
           remainingBalance: (parseFloat(subscriptionFee) - amountPaid).toString(),
           paymentMethod: Array.isArray(req.body.paymentMethod) ? req.body.paymentMethod[0] : (req.body.paymentMethod || 'cash'),
           description: 'Initial subscription payment',
         };
-
-        await storage.createPayment(paymentData);
       }
+
+      const subscriptionData = {
+        activity: req.body.activity || 'football',
+        status: 'active' as const,
+        startDate: subscriptionDate,
+        endDate: subscriptionEndDate,
+        sessionsAllowed: parseInt(req.body.totalSessionsAllowed) || 8,
+        sessionsUsed: 0,
+        price: subscriptionFee,
+      };
+
+      const player = await storage.createPlayerWithSubscription(playerData, subscriptionData, paymentData, documents);
 
       res.status(201).json(player);
     } catch (error) {
@@ -231,10 +266,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/players/:id", async (req, res) => {
     try {
+      const currentPlayer = await storage.getPlayer(req.params.id);
+      if (!currentPlayer) {
+        return res.status(404).json({ message: "Player not found" });
+      }
+
       // Convert date strings to Date objects and calculate renewal date if subscription date is provided
-      let updateData = { ...req.body };
+      const updateData: Record<string, any> = { ...req.body };
       
-      // Convert dateOfBirth string to Date object if present
       if (req.body.dateOfBirth) {
         updateData.dateOfBirth = new Date(req.body.dateOfBirth);
       }
@@ -263,6 +302,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const playerData = insertPlayerSchema.partial().parse(updateData);
       const player = await storage.updatePlayer(req.params.id, playerData);
+      
+      // Also update the active subscription if relevant fields are passed
+      if (req.body.activity || req.body.subscriptionEndDate || req.body.subscriptionDate) {
+        const updateSubData: any = { updatedAt: new Date() };
+        if (req.body.activity) updateSubData.activity = req.body.activity;
+        if (req.body.subscriptionDate) updateSubData.startDate = new Date(req.body.subscriptionDate);
+        if (req.body.subscriptionEndDate) updateSubData.endDate = new Date(req.body.subscriptionEndDate);
+        
+        await db.update(subscriptions)
+          .set(updateSubData)
+          .where(and(eq(subscriptions.playerId, req.params.id), eq(subscriptions.status, 'active')));
+      }
       
       if (!player) {
         return res.status(404).json({ message: "Player not found" });
@@ -294,6 +345,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!currentPlayer) {
         return res.status(404).json({ message: "Player not found" });
       }
+
+      // Fetch the active subscription to carry forward parameters
+      const [activeSub] = await db.select().from(subscriptions)
+        .where(and(eq(subscriptions.playerId, id), eq(subscriptions.status, 'active')));
+      
+      const currentActivity = activeSub?.activity || 'football';
+      const currentTotalSessions = activeSub?.sessionsAllowed || 8;
+      const currentFee = activeSub?.price || '200';
       
       // Use provided dates or calculate new dates
       const newSubscriptionDate = subscriptionStartDate ? new Date(subscriptionStartDate) : new Date();
@@ -303,46 +362,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return calculated;
       })();
       
-      // Archive all current payments before renewal
-      const currentSubscriptionStart = currentPlayer.subscriptionDate ? new Date(currentPlayer.subscriptionDate) : new Date();
-      const currentSubscriptionEnd = currentPlayer.subscriptionEndDate ? new Date(currentPlayer.subscriptionEndDate) : new Date();
-      
-      await storage.archivePlayerPayments(id, currentSubscriptionStart, currentSubscriptionEnd);
-      await storage.clearPlayerCurrentPayments(id);
-      
-      // Reset player data for renewal
-      const renewalData = {
-        subscriptionDate: newSubscriptionDate,
-        renewalDate: newRenewalDate,
-        subscriptionEndDate: newRenewalDate, // Use the renewal date as end date
-        subscriptionStatus: 'active' as any,
-        sessionsAttended: 0,
-        totalSessionsAllowed: totalSessionsAllowed || currentPlayer.totalSessionsAllowed,
-        monthlySubscriptionFee: subscriptionFee || currentPlayer.monthlySubscriptionFee,
-        pausedDate: null,
-        pauseReason: null,
-        updatedAt: new Date()
-      };
-      
       // Update player
-      const updatedPlayer = await storage.updatePlayer(id, renewalData);
-      
-      // Create new payment record for the new subscription period if amount paid is provided
-      if (amountPaid > 0) {
-        const newSubscriptionFee = parseFloat(subscriptionFee) || parseFloat(currentPlayer.monthlySubscriptionFee);
-        const paymentAmount = parseFloat(amountPaid);
-        const remainingBalance = Math.max(0, newSubscriptionFee - paymentAmount);
-        
-        const paymentData = {
-          playerId: id,
+      const renewalData = {};
+
+      const newSubscriptionFee = parseFloat(subscriptionFee) || parseFloat(currentFee) || 0;
+      const paymentAmount = parseFloat(amountPaid) || 0;
+
+      if (isNaN(newSubscriptionFee) || newSubscriptionFee < 0) {
+        return res.status(400).json({ message: "Subscription fee cannot be negative" });
+      }
+      if (isNaN(paymentAmount) || paymentAmount < 0) {
+        return res.status(400).json({ message: "Amount paid cannot be negative" });
+      }
+      if (paymentAmount > newSubscriptionFee) {
+        return res.status(400).json({ message: "Amount paid cannot exceed subscription fee" });
+      }
+
+      let paymentData: any = undefined;
+      if (newSubscriptionFee > 0 && paymentAmount > 0) {
+        const remainingBalance = newSubscriptionFee - paymentAmount;
+        paymentData = {
           subscriptionFee: newSubscriptionFee.toString(),
           amountPaid: paymentAmount.toString(),
           remainingBalance: remainingBalance.toString(),
           paymentMethod: paymentMethod,
           description: description || "Payment for new subscription period",
         };
-        await storage.createPayment(paymentData);
       }
+
+      const subscriptionData = {
+        activity: currentActivity,
+        status: 'active' as const,
+        startDate: newSubscriptionDate,
+        endDate: newRenewalDate,
+        sessionsAllowed: totalSessionsAllowed || currentTotalSessions,
+        sessionsUsed: 0,
+        price: newSubscriptionFee.toString(),
+      };
+
+      const updatedPlayer = await storage.renewPlayerSubscription(id, renewalData, subscriptionData, paymentData);
       
       res.json(updatedPlayer);
     } catch (error) {
@@ -451,9 +509,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const payment = await storage.createPayment(paymentData);
       
       // Setting player to active status because they made a payment
-      await storage.updatePlayer((paymentData as any).playerId, {
-        subscriptionStatus: 'active'
-      });
+      await storage.updatePlayerSubscriptionStatus((paymentData as any).playerId, 'active');
 
       res.status(201).json(payment);
     } catch (error) {
@@ -467,7 +523,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { playerId, amountPaid, paymentMethod, description } = req.body;
 
       // Get player to access subscription fee
-      const player = await storage.getPlayerById(playerId);
+      const player = await storage.getPlayer(playerId);
       if (!player) {
         return res.status(404).json({ message: "Player not found" });
       }
@@ -476,7 +532,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const playerPayments = await storage.getPlayerPayments(playerId);
       
       // Use player's monthly subscription fee as the baseline
-      const subscriptionFee = parseFloat(player.monthlySubscriptionFee);
+      const subscriptionFee = parseFloat((player as any).monthlySubscriptionFee || '0');
       
       // Calculate total paid so far
       const totalPaidSoFar = playerPayments.reduce((sum: number, payment: any) => {
@@ -484,6 +540,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }, 0);
       
       const newAmountPaid = parseFloat(amountPaid);
+      if (isNaN(newAmountPaid) || newAmountPaid <= 0) {
+        return res.status(400).json({ message: "Amount paid must be greater than zero" });
+      }
+      
       const newTotalPaid = totalPaidSoFar + newAmountPaid;
       const newRemainingBalance = Math.max(0, subscriptionFee - newTotalPaid);
 
@@ -510,9 +570,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const payment = await storage.createPayment(paymentData);
 
       // Setting player to active status because they made a payment
-      await storage.updatePlayer(playerId, {
-        subscriptionStatus: 'active'
-      });
+      await storage.updatePlayerSubscriptionStatus(playerId, 'active');
 
       res.status(201).json(payment);
     } catch (error) {
@@ -619,6 +677,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const file = files[0];
+      if (!validateFileSignature(file.path)) {
+         fs.unlinkSync(file.path);
+         return res.status(400).json({ message: "Invalid file signature. File is potentially malicious." });
+      }
 
       const document = await storage.createPlayerDocument({
         playerId,
@@ -683,9 +745,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/sessions", async (req, res) => {
     try {
+      const playerId = req.body.playerId;
+      let subscriptionId = req.body.subscriptionId;
+
+      if (!subscriptionId) {
+        const [activeSub] = await db.select().from(subscriptions)
+          .where(and(eq(subscriptions.playerId, playerId), eq(subscriptions.status, 'active')));
+        if (!activeSub) {
+          return res.status(400).json({ message: "Player does not have an active subscription." });
+        }
+        subscriptionId = activeSub.id;
+      }
+
       // Convert date strings to Date objects before validation
       const sessionData = {
-        playerId: req.body.playerId,
+        playerId,
         sessionDate: new Date(req.body.sessionDate),
         scheduledStartTime: new Date(req.body.scheduledStartTime), 
         scheduledEndTime: new Date(req.body.scheduledEndTime),
@@ -695,9 +769,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sessionStatus: req.body.sessionStatus || 'scheduled',
         actualStartTime: req.body.actualStartTime ? new Date(req.body.actualStartTime) : null,
         actualEndTime: req.body.actualEndTime ? new Date(req.body.actualEndTime) : null,
+        subscriptionId,
       };
       
-      const session = await storage.createSession(sessionData);
+      const session = await storage.createSession(sessionData as any);
       res.json(session);
     } catch (error: any) {
       console.error("Error creating session:", error);
@@ -906,6 +981,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const advance = await storage.createTrainerAdvance({
         trainerId: req.params.id,
         amount: String(amount),
+        remainingBalance: String(amount),
         notes: notes || null,
       });
       res.status(201).json(advance);
@@ -1161,6 +1237,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const file = req.file;
       if (!file) {
         return res.status(400).json({ message: "No file uploaded" });
+      }
+      if (!validateFileSignature(file.path)) {
+         fs.unlinkSync(file.path);
+         return res.status(400).json({ message: "Invalid file signature. File is potentially malicious." });
       }
       const receiptUrl = `/uploads/${file.filename}`;
       const updated = await storage.updateExpense(req.params.id, { receiptUrl } as any);

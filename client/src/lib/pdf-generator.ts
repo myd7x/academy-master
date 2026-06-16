@@ -59,11 +59,11 @@ export function generateReceipt(player: Player, payment: Payment, allPayments?: 
   pdf.setTextColor(0, 0, 0);
   pdf.text(player.fullName, 60, startY + 10);
 
-  const activity = ACTIVITIES[player.activity as keyof typeof ACTIVITIES];
+  const activity = ACTIVITIES[(player as any).activity as keyof typeof ACTIVITIES];
   pdf.setTextColor(55, 65, 81);
   pdf.text(`Activity:`, 20, startY + 20);
   pdf.setTextColor(0, 0, 0);
-  pdf.text(`${activity?.label || player.activity}`, 60, startY + 20);
+  pdf.text(`${activity?.label || (player as any).activity}`, 60, startY + 20);
 
   pdf.setTextColor(55, 65, 81);
   pdf.text(`Date:`, 20, startY + 30);
@@ -183,11 +183,11 @@ export function generatePlayerProfile(player: Player, payments: Payment[], sessi
   pdf.setTextColor(55, 65, 81);
   pdf.text(new Date(player.dateOfBirth).toLocaleDateString(), 70, startY + 32);
 
-  const activity = ACTIVITIES[player.activity as keyof typeof ACTIVITIES];
+  const activity = ACTIVITIES[(player as any).activity as keyof typeof ACTIVITIES];
   pdf.setTextColor(0, 0, 0);
   pdf.text(`Activity:`, 25, startY + 42);
   pdf.setTextColor(55, 65, 81);
-  pdf.text(`${activity?.label || player.activity}`, 70, startY + 42);
+  pdf.text(`${activity?.label || (player as any).activity}`, 70, startY + 42);
 
   pdf.setTextColor(0, 0, 0);
   pdf.text(`Phone:`, 25, startY + 52);
@@ -211,27 +211,27 @@ export function generatePlayerProfile(player: Player, payments: Payment[], sessi
   pdf.setTextColor(0, 0, 0);
   pdf.text(`Status:`, 25, startY + 96);
   pdf.setTextColor(55, 65, 81);
-  pdf.text(player.subscriptionStatus?.replace('_', ' ') || 'N/A', 70, startY + 96);
+  pdf.text((player as any).subscriptionStatus?.replace('_', ' ') || 'N/A', 70, startY + 96);
 
   pdf.setTextColor(0, 0, 0);
   pdf.text(`Start Date:`, 25, startY + 106);
   pdf.setTextColor(55, 65, 81);
-  pdf.text(new Date(player.subscriptionDate).toLocaleDateString(), 70, startY + 106);
+  pdf.text(new Date((player as any).subscriptionDate).toLocaleDateString(), 70, startY + 106);
 
   pdf.setTextColor(0, 0, 0);
   pdf.text(`Renewal Date:`, 25, startY + 116);
   pdf.setTextColor(55, 65, 81);
-  pdf.text(new Date(player.renewalDate).toLocaleDateString(), 70, startY + 116);
+  pdf.text(new Date((player as any).renewalDate).toLocaleDateString(), 70, startY + 116);
 
   pdf.setTextColor(0, 0, 0);
   pdf.text(`Monthly Fee:`, 25, startY + 126);
   pdf.setTextColor(55, 65, 81);
-  pdf.text(`AED ${player.monthlySubscriptionFee}`, 70, startY + 126);
+  pdf.text(`AED ${(player as any).monthlySubscriptionFee}`, 70, startY + 126);
 
   pdf.setTextColor(0, 0, 0);
   pdf.text(`Sessions:`, 25, startY + 136);
   pdf.setTextColor(55, 65, 81);
-  pdf.text(`${player.sessionsAttended}/${player.totalSessionsAllowed} attended (${Math.max(0, player.totalSessionsAllowed - player.sessionsAttended)} remaining)`, 70, startY + 136);
+  pdf.text(`${(player as any).sessionsAttended}/${(player as any).totalSessionsAllowed} attended (${Math.max(0, (player as any).totalSessionsAllowed - (player as any).sessionsAttended)} remaining)`, 70, startY + 136);
 
   // Payment history
   if (payments.length > 0) {
@@ -314,17 +314,17 @@ export function generateAllPlayersPDF(players: Player[]) {
       pdf.rect(15, y - 5, 267, 8, 'F');
     }
 
-    const activity = ACTIVITIES[player.activity as keyof typeof ACTIVITIES];
-    const sessionsLeft = Math.max(0, player.totalSessionsAllowed - player.sessionsAttended);
+    const activity = ACTIVITIES[(player as any).activity as keyof typeof ACTIVITIES];
+    const sessionsLeft = Math.max(0, (player as any).totalSessionsAllowed - (player as any).sessionsAttended);
 
     pdf.setFontSize(8);
     pdf.setTextColor(0, 0, 0);
     pdf.text(player.fullName.slice(0, 28), colX[0], y);
-    pdf.text(activity?.label || player.activity, colX[1], y);
-    pdf.text((player.subscriptionStatus || '').replace('_', ' '), colX[2], y);
-    pdf.text(`${player.sessionsAttended}/${player.totalSessionsAllowed} (${sessionsLeft} left)`, colX[3], y);
-    pdf.text(`AED ${player.monthlySubscriptionFee}`, colX[4], y);
-    pdf.text(new Date(player.renewalDate).toLocaleDateString(), colX[5], y);
+    pdf.text(activity?.label || (player as any).activity, colX[1], y);
+    pdf.text(((player as any).subscriptionStatus || '').replace('_', ' '), colX[2], y);
+    pdf.text(`${(player as any).sessionsAttended}/${(player as any).totalSessionsAllowed} (${sessionsLeft} left)`, colX[3], y);
+    pdf.text(`AED ${(player as any).monthlySubscriptionFee}`, colX[4], y);
+    pdf.text(new Date((player as any).renewalDate).toLocaleDateString(), colX[5], y);
 
     y += 8;
   });

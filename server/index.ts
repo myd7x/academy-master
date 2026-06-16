@@ -12,6 +12,13 @@ app.use(express.urlencoded({ extended: false }));
 const uploadsPath = path.join(process.cwd(), 'client/public/uploads');
 app.use('/uploads', express.static(uploadsPath));
 
+import rateLimit from "express-rate-limit";
+const apiLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 1000, message: "Too many requests" });
+const authLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 20, message: "Too many login attempts" });
+
+app.use('/api', apiLimiter);
+app.use('/api/login', authLimiter);
+
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;

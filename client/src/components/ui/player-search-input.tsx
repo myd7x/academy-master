@@ -31,8 +31,8 @@ export default function PlayerSearchInput({
   const filteredPlayers = players.filter(player => {
     const searchLower = searchTerm.toLowerCase();
     return (
-      player.fullName.toLowerCase().includes(searchLower) ||
-      player.activity.toLowerCase().includes(searchLower) ||
+      player.fullName?.toLowerCase().includes(searchLower) ||
+      player.activity?.toLowerCase().includes(searchLower) ||
       (player.phoneNumber && player.phoneNumber.includes(searchTerm))
     );
   }).slice(0, 10); // Limit to 10 results
@@ -62,7 +62,7 @@ export default function PlayerSearchInput({
               <p className="text-sm font-medium text-gray-900">{selectedPlayer.fullName}</p>
               <div className="flex items-center space-x-2">
                 <Badge variant="outline" className="text-xs">
-                  {ACTIVITIES[selectedPlayer.activity as keyof typeof ACTIVITIES]?.emoji} {selectedPlayer.activity}
+                  {(selectedPlayer.activity && ACTIVITIES[selectedPlayer.activity as keyof typeof ACTIVITIES]?.emoji) || '-'} {selectedPlayer.activity || 'No Activity'}
                 </Badge>
                 {selectedPlayer.phoneNumber && (
                   <span className="text-xs text-gray-500">{selectedPlayer.phoneNumber}</span>
@@ -116,7 +116,7 @@ export default function PlayerSearchInput({
                         <p className="text-sm font-medium text-gray-900">{player.fullName}</p>
                         <div className="flex items-center space-x-2">
                           <Badge variant="outline" className="text-xs">
-                            {ACTIVITIES[player.activity as keyof typeof ACTIVITIES]?.emoji} {player.activity}
+                            {(player.activity && ACTIVITIES[player.activity as keyof typeof ACTIVITIES]?.emoji) || '-'} {player.activity || 'No Activity'}
                           </Badge>
                           {player.phoneNumber && (
                             <span className="text-xs text-gray-500">{player.phoneNumber}</span>

@@ -5,6 +5,7 @@ import {
   payments, 
   paymentRefunds,
   paymentHistory,
+  paymentRefundHistory,
   sessions,
   users,
   trainers,
@@ -26,6 +27,8 @@ import {
   type InsertPaymentRefund,
   type PaymentHistory,
   type InsertPaymentHistory,
+  type PaymentRefundHistory,
+  type InsertPaymentRefundHistory,
   type Session,
   type InsertSession,
   type User,
@@ -48,6 +51,12 @@ import {
   type InsertInventoryTransaction,
   type ActivityLog,
   type InsertActivityLog,
+  subscriptions,
+  type Subscription,
+  type InsertSubscription,
+  accountingPeriods,
+  auditLogs,
+  trainerAdvanceRepayments,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, asc, sql, and, gte, lte, lt, ne, count, sum, isNull } from "drizzle-orm";
@@ -110,12 +119,14 @@ export interface IStorage {
 
   // Players
   getPlayer(id: string): Promise<Player | undefined>;
-  getPlayerById(id: string): Promise<Player | undefined>;
   getPlayers(): Promise<Player[]>;
   getPlayersByActivity(activity: string): Promise<Player[]>;
   createPlayer(player: InsertPlayer): Promise<Player>;
+  createPlayerWithSubscription(player: InsertPlayer, subscription: Omit<InsertSubscription, 'playerId'>, paymentData?: Omit<InsertPayment, 'playerId'>, documents?: Omit<InsertPlayerDocument, 'playerId'>[]): Promise<Player>;
   updatePlayer(id: string, player: Partial<typeof players.$inferInsert>): Promise<Player | undefined>;
   deletePlayer(id: string): Promise<boolean>;
+  updatePlayerSubscriptionStatus(playerId: string, status: string): Promise<void>;
+  renewPlayerSubscription(playerId: string, renewalData: Partial<typeof players.$inferInsert>, subscriptionData: Omit<InsertSubscription, 'playerId'>, paymentData?: Omit<InsertPayment, 'playerId'>): Promise<Player>;
   
   // Player Documents
   getPlayerDocuments(playerId: string): Promise<PlayerDocument[]>;
@@ -302,22 +313,85 @@ export class DatabaseStorage implements IStorage {
 
   async getPlayer(id: string): Promise<Player | undefined> {
     const [player] = await db.select().from(players).where(eq(players.id, id));
-    return player || undefined;
-  }
+    if (!player) return undefined;
 
-  async getPlayerById(id: string): Promise<Player | undefined> {
-    const [player] = await db.select().from(players).where(eq(players.id, id));
-    return player || undefined;
+    const [sub] = await db.select()
+      .from(subscriptions)
+      .where(eq(subscriptions.playerId, id))
+      .orderBy(desc(subscriptions.createdAt))
+      .limit(1);
+
+    return {
+      ...player,
+      activity: sub?.activity || null,
+      subscriptionStatus: sub?.status || 'expired',
+      sessionsAttended: sub?.sessionsUsed || 0,
+      totalSessionsAllowed: sub?.sessionsAllowed || 8,
+      subscriptionDate: sub?.startDate || player.createdAt,
+      subscriptionEndDate: sub?.endDate || null,
+      renewalDate: sub?.endDate || null,
+      monthlySubscriptionFee: sub?.price || '0.00',
+    } as any;
   }
 
   async getPlayers(): Promise<Player[]> {
     await this.updateExpiredSubscriptions();
-    return await db.select().from(players).orderBy(desc(players.createdAt));
+    const allPlayers = await db.select().from(players).orderBy(desc(players.createdAt));
+    const allSubs = await db.select().from(subscriptions).orderBy(desc(subscriptions.createdAt));
+
+    const latestSubMap = new Map<string, typeof subscriptions.$inferSelect>();
+    for (const sub of allSubs) {
+      if (!latestSubMap.has(sub.playerId)) {
+        latestSubMap.set(sub.playerId, sub);
+      }
+    }
+
+    return allPlayers.map(player => {
+      const sub = latestSubMap.get(player.id);
+      return {
+        ...player,
+        activity: sub?.activity || null,
+        subscriptionStatus: sub?.status || 'expired',
+        sessionsAttended: sub?.sessionsUsed || 0,
+        totalSessionsAllowed: sub?.sessionsAllowed || 8,
+        subscriptionDate: sub?.startDate || player.createdAt,
+        subscriptionEndDate: sub?.endDate || null,
+        renewalDate: sub?.endDate || null,
+        monthlySubscriptionFee: sub?.price || '0.00',
+      } as any;
+    });
   }
 
   async getPlayersByActivity(activity: string): Promise<Player[]> {
     await this.updateExpiredSubscriptions();
-    return await db.select().from(players).where(eq(players.activity, activity as any));
+    const records = await db.select({ 
+      player: players,
+      subscription: subscriptions
+    })
+      .from(subscriptions)
+      .innerJoin(players, eq(players.id, subscriptions.playerId))
+      .where(and(eq(subscriptions.activity, activity as any), eq(subscriptions.status, 'active')))
+      .orderBy(desc(subscriptions.createdAt));
+
+    const uniquePlayers: any[] = [];
+    const seen = new Set<string>();
+    for (const r of records) {
+      if (!seen.has(r.player.id)) {
+        seen.add(r.player.id);
+        uniquePlayers.push({
+          ...r.player,
+          activity: r.subscription.activity,
+          subscriptionStatus: r.subscription.status,
+          sessionsAttended: r.subscription.sessionsUsed,
+          totalSessionsAllowed: r.subscription.sessionsAllowed,
+          subscriptionDate: r.subscription.startDate,
+          subscriptionEndDate: r.subscription.endDate,
+          renewalDate: r.subscription.endDate,
+          monthlySubscriptionFee: r.subscription.price,
+        });
+      }
+    }
+    return uniquePlayers;
   }
 
   async createPlayer(insertPlayer: InsertPlayer): Promise<Player> {
@@ -325,10 +399,53 @@ export class DatabaseStorage implements IStorage {
     await db.insert(players).values({
       ...insertPlayer,
       id,
-      renewalDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
     } as any);
-    const [player] = await db.select().from(players).where(eq(players.id, id));
-    return player;
+    return (await this.getPlayer(id))!;
+  }
+
+  async createPlayerWithSubscription(insertPlayer: InsertPlayer, subscriptionData: Omit<InsertSubscription, 'playerId'>, paymentData?: Omit<InsertPayment, 'playerId'>, documents?: Omit<InsertPlayerDocument, 'playerId'>[]): Promise<Player> {
+    const id = nanoid();
+    await db.transaction(async (tx) => {
+      // 1. Insert Player
+      await tx.insert(players).values({ ...insertPlayer, id } as any);
+      
+      // 2. Insert Subscription
+      const subId = nanoid();
+      await tx.insert(subscriptions).values({
+        ...subscriptionData,
+        id: subId,
+        playerId: id,
+      });
+
+      // 3. Insert Payment if provided
+      if (paymentData) {
+        const paymentId = nanoid();
+        const receiptNumber = `E1-${new Date().getFullYear()}-${Date.now()}`;
+        
+        const subscriptionFee = parseFloat(String(paymentData.subscriptionFee || '0'));
+        const amountPaid = parseFloat(String(paymentData.amountPaid || '0'));
+        const remaining = parseFloat(String((paymentData as any).remainingBalance || '0'));
+        let derivedStatus: string = remaining <= 0 ? 'completed' : (amountPaid > 0 ? 'pending' : 'pending');
+
+        await tx.insert(payments).values({
+          ...paymentData,
+          id: paymentId,
+          playerId: id,
+          receiptNumber,
+          paymentStatus: derivedStatus,
+        } as any);
+      }
+
+      // 4. Insert Documents if provided
+      if (documents && documents.length > 0) {
+        for (const doc of documents) {
+          const docId = nanoid();
+          await tx.insert(playerDocuments).values({ ...doc, id: docId, playerId: id } as any);
+        }
+      }
+    });
+
+    return (await this.getPlayer(id))!;
   }
 
   async updatePlayer(id: string, playerUpdate: Partial<typeof players.$inferInsert>): Promise<Player | undefined> {
@@ -336,13 +453,93 @@ export class DatabaseStorage implements IStorage {
       .update(players)
       .set({ ...playerUpdate, updatedAt: new Date() })
       .where(eq(players.id, id));
-    const [player] = await db.select().from(players).where(eq(players.id, id));
-    return player || undefined;
+    return await this.getPlayer(id);
   }
 
   async deletePlayer(id: string): Promise<boolean> {
     const result = await db.delete(players).where(eq(players.id, id));
     return (result[0]?.affectedRows ?? 0) > 0;
+  }
+
+  async updatePlayerSubscriptionStatus(playerId: string, status: string): Promise<void> {
+    await db.update(subscriptions)
+      .set({ status: status as any, updatedAt: new Date() })
+      .where(eq(subscriptions.playerId, playerId));
+  }
+
+  async renewPlayerSubscription(playerId: string, renewalData: Partial<typeof players.$inferInsert>, subscriptionData: Omit<InsertSubscription, 'playerId'>, paymentData?: Omit<InsertPayment, 'playerId'>): Promise<Player> {
+    await db.transaction(async (tx) => {
+      const currentPayments = await tx.select().from(payments).where(eq(payments.playerId, playerId));
+      
+      for (const payment of currentPayments) {
+        const historyId = nanoid();
+        await tx.insert(paymentHistory).values({
+          id: historyId,
+          playerId: payment.playerId,
+          subscriptionFee: payment.subscriptionFee,
+          amountPaid: payment.amountPaid,
+          remainingBalance: payment.remainingBalance,
+          paymentMethod: payment.paymentMethod,
+          paymentStatus: payment.paymentStatus,
+          paymentDate: payment.paymentDate,
+          description: payment.description,
+          receiptNumber: payment.receiptNumber,
+          subscriptionPeriodStart: new Date(), 
+          subscriptionPeriodEnd: new Date(), 
+          createdAt: payment.createdAt,
+        });
+
+        const refunds = await tx.select().from(paymentRefunds).where(eq(paymentRefunds.paymentId, payment.id));
+        for (const refund of refunds) {
+          await tx.insert(paymentRefundHistory).values({
+            id: nanoid(),
+            originalRefundId: refund.id,
+            paymentHistoryId: historyId,
+            playerId: refund.playerId,
+            refundAmount: refund.refundAmount,
+            refundMethod: refund.refundMethod,
+            reason: refund.reason,
+            refundedBy: refund.refundedBy,
+            refundDate: refund.refundDate,
+            createdAt: refund.createdAt,
+          });
+        }
+      }
+
+      await tx.delete(payments).where(eq(payments.playerId, playerId));
+      await tx.update(players).set({ ...renewalData, updatedAt: new Date() }).where(eq(players.id, playerId));
+
+      // Mark all previous subscriptions as cancelled so they don't appear in renewal notifications
+      await tx.update(subscriptions)
+        .set({ status: 'cancelled' })
+        .where(eq(subscriptions.playerId, playerId));
+
+      await tx.insert(subscriptions).values({
+        ...subscriptionData,
+        id: nanoid(),
+        playerId,
+      });
+
+      if (paymentData) {
+        const paymentId = nanoid();
+        const receiptNumber = `E1-${new Date().getFullYear()}-${Date.now()}`;
+        
+        const subscriptionFee = parseFloat(String(paymentData.subscriptionFee || '0'));
+        const amountPaid = parseFloat(String(paymentData.amountPaid || '0'));
+        const remaining = parseFloat(String((paymentData as any).remainingBalance || '0'));
+        let derivedStatus: string = remaining <= 0 ? 'completed' : (amountPaid > 0 ? 'pending' : 'pending');
+
+        await tx.insert(payments).values({
+          ...paymentData,
+          id: paymentId,
+          playerId,
+          receiptNumber,
+          paymentStatus: derivedStatus,
+        } as any);
+      }
+    });
+
+    return (await this.getPlayer(playerId))!;
   }
 
   async getPlayerDocuments(playerId: string): Promise<PlayerDocument[]> {
@@ -384,9 +581,10 @@ export class DatabaseStorage implements IStorage {
         paymentDate: payments.paymentDate,
         receiptNumber: payments.receiptNumber,
         description: payments.description,
+        totalRefunded: payments.totalRefunded,
         createdAt: payments.createdAt,
         playerName: players.fullName,
-        activity: players.activity,
+        activity: sql<string>`(SELECT activity FROM subscriptions WHERE player_id = ${players.id} ORDER BY created_at DESC LIMIT 1)`,
       })
       .from(payments)
       .leftJoin(players, eq(payments.playerId, players.id))
@@ -554,7 +752,7 @@ export class DatabaseStorage implements IStorage {
 
         await tx
           .update(payments)
-          .set({ paymentStatus: newStatus } as any)
+          .set({ paymentStatus: newStatus, totalRefunded: fromCents(newTotalCents) } as any)
           .where(eq(payments.id, paymentId));
 
         // Audit success inside transaction scope (will still log even if outer try catches)
@@ -608,106 +806,86 @@ export class DatabaseStorage implements IStorage {
         scheduledEndTime: sessions.scheduledEndTime,
         actualStartTime: sessions.actualStartTime,
         actualEndTime: sessions.actualEndTime,
+        subscriptionId: sessions.subscriptionId,
         attendanceStatus: sessions.attendanceStatus,
         sessionStatus: sessions.sessionStatus,
         instructorName: sessions.instructorName,
         notes: sessions.notes,
         createdAt: sessions.createdAt,
         playerName: players.fullName,
-        activity: players.activity,
+        activity: subscriptions.activity,
       })
       .from(sessions)
       .leftJoin(players, eq(sessions.playerId, players.id))
+      .leftJoin(subscriptions, eq(sessions.subscriptionId, subscriptions.id))
       .orderBy(desc(sessions.sessionDate));
   }
 
   async createSession(session: InsertSession): Promise<Session> {
     const id = nanoid();
-    await db.insert(sessions).values({ ...session, id } as any);
-    const [sess] = await db.select().from(sessions).where(eq(sessions.id, id));
-    
-    // Update player's sessions attended count if attendance is marked as present OR late
     const attendanceStatus = (session as any).attendanceStatus;
-    if (sess && (attendanceStatus === 'present' || attendanceStatus === 'late')) {
-      await db
-        .update(players)
-        .set({ 
-          sessionsAttended: sql`${players.sessionsAttended} + 1`,
-          updatedAt: new Date()
-        })
-        .where(eq(players.id, sess.playerId));
-    }
-    
-    return sess;
+    const isAttended = attendanceStatus === 'present' || attendanceStatus === 'late';
+
+    return await db.transaction(async (tx) => {
+      if (isAttended) {
+        const [result] = await tx.update(subscriptions)
+          .set({ sessionsUsed: sql`${subscriptions.sessionsUsed} + 1`, updatedAt: new Date() })
+          .where(and(
+            eq(subscriptions.id, (session as any).subscriptionId),
+            sql`${subscriptions.sessionsUsed} < ${subscriptions.sessionsAllowed}`
+          ));
+        
+        if (result.affectedRows === 0) {
+          throw new Error("Maximum sessions exceeded or subscription not found");
+        }
+      }
+      
+      await tx.insert(sessions).values({ ...session, id } as any);
+      const [sess] = await tx.select().from(sessions).where(eq(sessions.id, id));
+      return sess;
+    });
   }
 
   async updateSession(id: string, sessionUpdate: Partial<InsertSession>): Promise<Session | undefined> {
-    const [existingSession] = await db.select().from(sessions).where(eq(sessions.id, id));
-    
-    await db
-      .update(sessions)
-      .set(sessionUpdate)
-      .where(eq(sessions.id, id));
+    return await db.transaction(async (tx) => {
+      const [existingSession] = await tx.select().from(sessions).where(eq(sessions.id, id));
+      if (!existingSession) throw new Error("Session not found");
       
-    const [selectedSession] = await db.select().from(sessions).where(eq(sessions.id, id));
-
-    if (existingSession && selectedSession) {
       const oldStatus = existingSession.attendanceStatus;
-      const newStatus = selectedSession.attendanceStatus;
-      // Both 'present' and 'late' count as attended
+      const newStatus = sessionUpdate.attendanceStatus !== undefined ? sessionUpdate.attendanceStatus : oldStatus;
+      
       const wasAttended = oldStatus === 'present' || oldStatus === 'late';
       const isAttended = newStatus === 'present' || newStatus === 'late';
-
+      
       if (!wasAttended && isAttended) {
-        await db.update(players)
-          .set({ sessionsAttended: sql`${players.sessionsAttended} + 1`, updatedAt: new Date() })
-          .where(eq(players.id, existingSession.playerId));
+        const [result] = await tx.update(subscriptions)
+          .set({ sessionsUsed: sql`${subscriptions.sessionsUsed} + 1`, updatedAt: new Date() })
+          .where(and(
+            eq(subscriptions.id, existingSession.subscriptionId),
+            sql`${subscriptions.sessionsUsed} < ${subscriptions.sessionsAllowed}`
+          ));
+        if (result.affectedRows === 0) {
+          throw new Error("Maximum sessions exceeded or subscription not found");
+        }
       } else if (wasAttended && !isAttended) {
-        await db.update(players)
-          .set({ sessionsAttended: sql`GREATEST(0, ${players.sessionsAttended} - 1)`, updatedAt: new Date() })
-          .where(eq(players.id, existingSession.playerId));
+        await tx.update(subscriptions)
+          .set({ sessionsUsed: sql`GREATEST(0, ${subscriptions.sessionsUsed} - 1)`, updatedAt: new Date() })
+          .where(eq(subscriptions.id, existingSession.subscriptionId));
       }
-    }
-
-    return selectedSession || undefined;
+      
+      await tx.update(sessions).set(sessionUpdate).where(eq(sessions.id, id));
+      const [selectedSession] = await tx.select().from(sessions).where(eq(sessions.id, id));
+      return selectedSession;
+    });
   }
 
   async markAttendance(sessionId: string, attendanceStatus: string, notes?: string): Promise<Session | undefined> {
-    const [existingSession] = await db.select().from(sessions).where(eq(sessions.id, sessionId));
-
-    // 'present' and 'late' both mark the session as attended
     const isAttendedStatus = attendanceStatus === 'present' || attendanceStatus === 'late';
-
-    await db
-      .update(sessions)
-      .set({ 
+    return this.updateSession(sessionId, {
         attendanceStatus: attendanceStatus as any,
         sessionStatus: isAttendedStatus ? 'attended' : 'missed' as any,
-        notes: notes,
-      })
-      .where(eq(sessions.id, sessionId));
-      
-    const [session] = await db.select().from(sessions).where(eq(sessions.id, sessionId));
-
-    if (existingSession && session) {
-      const oldStatus = existingSession.attendanceStatus;
-      const newStatus = session.attendanceStatus;
-      // Both 'present' and 'late' count as attended
-      const wasAttended = oldStatus === 'present' || oldStatus === 'late';
-      const nowAttended = newStatus === 'present' || newStatus === 'late';
-
-      if (!wasAttended && nowAttended) {
-        await db.update(players)
-          .set({ sessionsAttended: sql`${players.sessionsAttended} + 1`, updatedAt: new Date() })
-          .where(eq(players.id, session.playerId));
-      } else if (wasAttended && !nowAttended) {
-        await db.update(players)
-          .set({ sessionsAttended: sql`GREATEST(0, ${players.sessionsAttended} - 1)`, updatedAt: new Date() })
-          .where(eq(players.id, session.playerId));
-      }
-    }
-
-    return session || undefined;
+        notes: notes
+    });
   }
 
   // Auto-update subscription statuses based on end dates
@@ -717,26 +895,26 @@ export class DatabaseStorage implements IStorage {
 
     // Mark as expired: subscriptionEndDate has passed and still active
     await db
-      .update(players)
-      .set({ subscriptionStatus: 'expired' as any, updatedAt: new Date() })
+      .update(subscriptions)
+      .set({ status: 'expired' as any, updatedAt: new Date() })
       .where(
         and(
-          sql`${players.subscriptionEndDate} < ${now}`,
-          sql`${players.subscriptionEndDate} IS NOT NULL`,
-          sql`${players.subscriptionStatus} IN ('active', 'renewal_due')`
+          sql`${subscriptions.endDate} < ${now}`,
+          sql`${subscriptions.endDate} IS NOT NULL`,
+          sql`${subscriptions.status} IN ('active', 'renewal_due')`
         )
       );
 
     // Mark as renewal_due: subscriptionEndDate is within 3 days and still active
     await db
-      .update(players)
-      .set({ subscriptionStatus: 'renewal_due' as any, updatedAt: new Date() })
+      .update(subscriptions)
+      .set({ status: 'renewal_due' as any, updatedAt: new Date() })
       .where(
         and(
-          sql`${players.subscriptionEndDate} >= ${now}`,
-          sql`${players.subscriptionEndDate} <= ${threeDaysFromNow}`,
-          sql`${players.subscriptionEndDate} IS NOT NULL`,
-          eq(players.subscriptionStatus, 'active')
+          sql`${subscriptions.endDate} >= ${now}`,
+          sql`${subscriptions.endDate} <= ${threeDaysFromNow}`,
+          sql`${subscriptions.endDate} IS NOT NULL`,
+          eq(subscriptions.status, 'active')
         )
       );
   }
@@ -760,8 +938,8 @@ export class DatabaseStorage implements IStorage {
 
     const activeSubscriptionsResult = await db
       .select({ count: count() })
-      .from(players)
-      .where(eq(players.subscriptionStatus, 'active'));
+      .from(subscriptions)
+      .where(eq(subscriptions.status, 'active'));
     const activeSubscriptions = activeSubscriptionsResult[0].count;
 
     // ── Pending Player Payments (outstanding debt) ────────────────────────────
@@ -773,9 +951,10 @@ export class DatabaseStorage implements IStorage {
 
     // ── Player Activity Breakdown ─────────────────────────────────────────────
     const playersByActivityResult = await db
-      .select({ activity: players.activity, count: count() })
-      .from(players)
-      .groupBy(players.activity);
+      .select({ activity: subscriptions.activity, count: count() })
+      .from(subscriptions)
+      .where(eq(subscriptions.status, 'active'))
+      .groupBy(subscriptions.activity);
 
     // ── CASH FLOW: INCOME ─────────────────────────────────────────────────────
     // Income = real cash entering the academy.
@@ -919,12 +1098,25 @@ export class DatabaseStorage implements IStorage {
     const totalBonuses = bonusesResult[0].total || '0';
 
     // Outstanding Salaries = sum of positive NetPayable across all trainers this month
-    const trainersList = await this.getTrainers();
+    // N+1 Query Fixed: 4 queries instead of N*4 queries
+    const allSalaries = await db.select({ trainerId: trainers.id, salary: trainers.baseSalary }).from(trainers);
+    const allBonusesRaw = await db.select({ trainerId: trainerBonuses.trainerId, total: sql<string>`COALESCE(SUM(${trainerBonuses.amount}), 0)` }).from(trainerBonuses).where(eq(trainerBonuses.month, currentMonthStr)).groupBy(trainerBonuses.trainerId);
+    const allAdvancesRaw = await db.select({ trainerId: trainerAdvances.trainerId, total: sql<string>`COALESCE(SUM(${trainerAdvances.amount}), 0)` }).from(trainerAdvances).where(eq(trainerAdvances.status, 'pending')).groupBy(trainerAdvances.trainerId);
+    const allPaymentsRaw = await db.select({ trainerId: trainerSalaryPayments.trainerId, total: sql<string>`COALESCE(SUM(${trainerSalaryPayments.amount}), 0)` }).from(trainerSalaryPayments).where(eq(trainerSalaryPayments.month, currentMonthStr)).groupBy(trainerSalaryPayments.trainerId);
+
+    const bonusMap = Object.fromEntries(allBonusesRaw.map(b => [b.trainerId, parseFloat(b.total || '0')]));
+    const advanceMap = Object.fromEntries(allAdvancesRaw.map(a => [a.trainerId, parseFloat(a.total || '0')]));
+    const paymentMap = Object.fromEntries(allPaymentsRaw.map(p => [p.trainerId, parseFloat(p.total || '0')]));
+
     let outstandingSalariesNum = 0;
-    for (const t of trainersList) {
-      const ledger = await this.getTrainerLedger(t.id, currentMonthStr);
-      const netPay = parseFloat(ledger.netPayable);
-      if (netPay > 0) outstandingSalariesNum += netPay;
+    for (const t of allSalaries) {
+      const baseSalary = parseFloat(t.salary || '0');
+      const bonus = bonusMap[t.trainerId] || 0;
+      const advance = advanceMap[t.trainerId] || 0;
+      const paid = paymentMap[t.trainerId] || 0;
+      
+      const netPayable = baseSalary + bonus - advance - paid;
+      if (netPayable > 0) outstandingSalariesNum += netPayable;
     }
     const outstandingSalaries = outstandingSalariesNum.toFixed(2);
 
@@ -952,11 +1144,11 @@ export class DatabaseStorage implements IStorage {
     const overduePaymentsResult = await db
       .select({ total: sql<string>`COALESCE(CAST(SUM(${payments.remainingBalance}) AS CHAR), '0')` })
       .from(payments)
-      .leftJoin(players, eq(payments.playerId, players.id))
+      .leftJoin(subscriptions, eq(payments.playerId, subscriptions.playerId))
       .where(
         and(
           sql`${payments.remainingBalance} > 0`,
-          sql`${players.subscriptionStatus} IN ('expired', 'cancelled')`
+          sql`${subscriptions.status} IN ('expired', 'cancelled')`
         )
       );
     const overduePayments = overduePaymentsResult[0].total || '0';
@@ -1030,19 +1222,25 @@ export class DatabaseStorage implements IStorage {
     await this.updateExpiredSubscriptions();
 
     const upcomingRenewals = await db
-      .select()
+      .select({
+        id: players.id,
+        fullName: players.fullName,
+        phoneNumber: players.phoneNumber,
+        subscription: subscriptions
+      })
       .from(players)
+      .innerJoin(subscriptions, eq(players.id, subscriptions.playerId))
       .where(
         and(
-          lte(players.renewalDate, new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)), // Within 7 days
-          sql`${players.subscriptionStatus} IN ('active', 'renewal_due')`
+          lte(subscriptions.endDate, new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)), // Within 7 days
+          sql`${subscriptions.status} IN ('active', 'renewal_due')`
         )
       )
-      .orderBy(asc(players.renewalDate));
+      .orderBy(asc(subscriptions.endDate));
 
-    return upcomingRenewals.map((player: any) => ({
-      ...player,
-      sessionsLeft: Math.max(0, player.totalSessionsAllowed - player.sessionsAttended)
+    return upcomingRenewals.map((record: any) => ({
+      ...record,
+      sessionsLeft: Math.max(0, record.subscription.sessionsAllowed - record.subscription.sessionsUsed)
     }));
   }
 
@@ -1052,7 +1250,7 @@ export class DatabaseStorage implements IStorage {
       .select({
         id: players.id,
         fullName: players.fullName,
-        activity: players.activity,
+        activity: sql<string>`(SELECT activity FROM subscriptions WHERE player_id = ${players.id} ORDER BY created_at DESC LIMIT 1)`,
         createdAt: players.createdAt
       })
       .from(players)
@@ -1100,40 +1298,39 @@ export class DatabaseStorage implements IStorage {
     await this.updateExpiredSubscriptions();
 
     // Get all active + renewal_due + expired players that need attention
-    const allActivePlayers = await db
-      .select()
-      .from(players)
-      .where(sql`${players.subscriptionStatus} IN ('active', 'renewal_due', 'expired')`)
-      .orderBy(asc(players.renewalDate));
+    const activeSubs = await db
+      .select({
+        player: players,
+        subscription: subscriptions
+      })
+      .from(subscriptions)
+      .innerJoin(players, eq(players.id, subscriptions.playerId))
+      .where(sql`${subscriptions.status} IN ('active', 'renewal_due', 'expired')`)
+      .orderBy(asc(subscriptions.endDate));
 
     const now = new Date();
     const notifications: any[] = [];
 
-    for (const player of allActivePlayers) {
-      const renewalDate = player.renewalDate ? new Date(player.renewalDate) : null;
-      const endDate = player.subscriptionEndDate ? new Date(player.subscriptionEndDate) : renewalDate;
-      const referenceDate = endDate || renewalDate;
+    for (const record of activeSubs) {
+      const player = record.player;
+      const sub = record.subscription;
+      const endDate = sub.endDate ? new Date(sub.endDate) : null;
+      const referenceDate = endDate;
       const daysUntilRenewal = referenceDate
         ? Math.ceil((referenceDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
         : 0;
-      const sessionsLeft = Math.max(0, player.totalSessionsAllowed - player.sessionsAttended);
+      const sessionsLeft = Math.max(0, sub.sessionsAllowed - sub.sessionsUsed);
       
-      // Only show notifications for players who actually need renewal or have low sessions
       let shouldNotify = false;
       let reason: 'sessions_low' | 'renewal_due' = 'sessions_low';
 
-      // Expired subscriptions always show
-      if (player.subscriptionStatus === 'expired' || daysUntilRenewal < 0) {
+      if (sub.status === 'expired' || daysUntilRenewal < 0) {
         shouldNotify = true;
         reason = 'renewal_due';
-      }
-      // Renewal due status or within 3 days
-      else if (player.subscriptionStatus === 'renewal_due' || daysUntilRenewal <= 3) {
+      } else if (sub.status === 'renewal_due' || daysUntilRenewal <= 3) {
         shouldNotify = true;
         reason = 'renewal_due';
-      }
-      // Sessions critically low (3 or fewer)
-      else if (sessionsLeft <= 3) {
+      } else if (sessionsLeft <= 3) {
         shouldNotify = true;
         reason = 'sessions_low';
       }
@@ -1142,11 +1339,11 @@ export class DatabaseStorage implements IStorage {
         notifications.push({
           playerId: player.id,
           playerName: player.fullName,
-          activity: player.activity,
-          renewalDate: player.renewalDate,
+          activity: sub.activity,
+          renewalDate: sub.endDate,
           daysUntilRenewal,
           sessionsLeft,
-          subscriptionStatus: player.subscriptionStatus,
+          subscriptionStatus: sub.status,
           reason
         });
       }
@@ -1185,9 +1382,9 @@ export class DatabaseStorage implements IStorage {
 
     // Archive each payment
     for (const payment of currentPayments) {
-      const id = nanoid();
+      const historyId = nanoid();
       await db.insert(paymentHistory).values({
-        id,
+        id: historyId,
         playerId: payment.playerId,
         subscriptionFee: payment.subscriptionFee,
         amountPaid: payment.amountPaid,
@@ -1201,6 +1398,23 @@ export class DatabaseStorage implements IStorage {
         subscriptionPeriodEnd,
         createdAt: payment.createdAt,
       });
+
+      // Archive refunds for this payment
+      const refunds = await db.select().from(paymentRefunds).where(eq(paymentRefunds.paymentId, payment.id));
+      for (const refund of refunds) {
+        await db.insert(paymentRefundHistory).values({
+          id: nanoid(),
+          originalRefundId: refund.id,
+          paymentHistoryId: historyId,
+          playerId: refund.playerId,
+          refundAmount: refund.refundAmount,
+          refundMethod: refund.refundMethod,
+          reason: refund.reason,
+          refundedBy: refund.refundedBy,
+          refundDate: refund.refundDate,
+          createdAt: refund.createdAt,
+        });
+      }
     }
   }
 
